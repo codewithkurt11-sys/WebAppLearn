@@ -239,7 +239,7 @@ export default function JSBasics() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.amber}>🎯 JavaScript Basics Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.amber}>🎯 JavaScript Basics Quiz</CardTitle><Quiz questions={QUIZ} trackId="js-basics"/></Card>
           : content[tab]
         }
       </div>

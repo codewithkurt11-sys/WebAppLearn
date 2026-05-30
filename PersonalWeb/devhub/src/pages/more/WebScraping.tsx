@@ -204,7 +204,7 @@ export default function WebScraping() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.muted2}>🎯 Web Scraping Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.muted2}>🎯 Web Scraping Quiz</CardTitle><Quiz questions={QUIZ} trackId="scraping"/></Card>
           : content[tab]
         }
       </div>

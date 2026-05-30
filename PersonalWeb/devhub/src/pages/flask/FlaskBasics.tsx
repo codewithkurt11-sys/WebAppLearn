@@ -293,7 +293,7 @@ export default function FlaskBasics() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.green}>🎯 Flask Basics Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.green}>🎯 Flask Basics Quiz</CardTitle><Quiz questions={QUIZ} trackId="flask-basics"/></Card>
           : content[tab]
         }
       </div>

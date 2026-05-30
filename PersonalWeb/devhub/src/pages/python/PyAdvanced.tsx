@@ -453,7 +453,7 @@ export default function PyAdvanced() {
         {tab === "typehints"  && <TabTypeHints/>}
         {tab === "context"    && <TabContext/>}
         {tab === "meta"       && <TabMeta/>}
-        {tab === "quiz"       && <Card><CardTitle color={T.accent}>Quiz — Python Advanced</CardTitle><Quiz questions={QUIZ}/></Card>}
+        {tab === "quiz"       && <Card><CardTitle color={T.accent}>Quiz — Python Advanced</CardTitle><Quiz questions={QUIZ} trackId="py-adv"/></Card>}
       </div>
     </div>
   );

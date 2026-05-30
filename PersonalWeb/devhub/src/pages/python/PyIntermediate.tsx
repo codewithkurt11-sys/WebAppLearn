@@ -175,7 +175,7 @@ export default function PyIntermediate() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.accent}>🎯 Python Intermediate Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.accent}>🎯 Python Intermediate Quiz</CardTitle><Quiz questions={QUIZ} trackId="py-inter"/></Card>
           : content[tab]
         }
       </div>

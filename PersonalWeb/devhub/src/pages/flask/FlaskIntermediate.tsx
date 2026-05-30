@@ -433,7 +433,7 @@ export default function FlaskIntermediate() {
         {tab === "sessions"    && <TabSessions/>}
         {tab === "sqlite"      && <TabSQLite/>}
         {tab === "errors"      && <TabErrors/>}
-        {tab === "quiz"        && <Card><CardTitle color={T.green}>Quiz — Flask Intermediate</CardTitle><Quiz questions={QUIZ}/></Card>}
+        {tab === "quiz"        && <Card><CardTitle color={T.green}>Quiz — Flask Intermediate</CardTitle><Quiz questions={QUIZ} trackId="flask-inter"/></Card>}
       </div>
     </div>
   );

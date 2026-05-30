@@ -147,7 +147,7 @@ export default function Tkinter() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.sky}>🎯 Tkinter Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.sky}>🎯 Tkinter Quiz</CardTitle><Quiz questions={QUIZ} trackId="tkinter"/></Card>
           : content[tab]
         }
       </div>

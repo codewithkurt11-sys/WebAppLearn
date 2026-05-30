@@ -773,7 +773,7 @@ export default function PyBasics() {
         </p>
         <TabBar tabs={PYB_TABS} active={tab} onChange={setTab}/>
         {tab === "quiz"
-          ? <Card><CardTitle color={T.accent}>🎯 Python Basics Quiz</CardTitle><Quiz questions={PYB_QUIZ}/></Card>
+          ? <Card><CardTitle color={T.accent}>🎯 Python Basics Quiz</CardTitle><Quiz questions={PYB_QUIZ} trackId="py-basics"/></Card>
           : content[tab]
         }
       </div>

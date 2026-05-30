@@ -163,7 +163,7 @@ export default function SQLitePage() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab==="quiz"
-          ? <Card><CardTitle color={T.sky}>🎯 SQLite Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.sky}>🎯 SQLite Quiz</CardTitle><Quiz questions={QUIZ} trackId="sqlite"/></Card>
           : content[tab]
         }
       </div>

@@ -392,7 +392,7 @@ export default function FlaskExpert() {
         {tab === "uploads"    && <TabUploads/>}
         {tab === "security"   && <TabSecurity/>}
         {tab === "deploy"     && <TabDeploy/>}
-        {tab === "quiz"       && <Card><CardTitle color={T.green}>Quiz — Flask Expert</CardTitle><Quiz questions={QUIZ}/></Card>}
+        {tab === "quiz"       && <Card><CardTitle color={T.green}>Quiz — Flask Expert</CardTitle><Quiz questions={QUIZ} trackId="flask-expert"/></Card>}
       </div>
     </div>
   );

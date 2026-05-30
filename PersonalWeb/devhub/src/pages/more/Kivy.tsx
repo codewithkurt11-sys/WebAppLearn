@@ -607,7 +607,7 @@ export default function Kivy() {
         {tab === "quiz"    && (
           <Card>
             <CardTitle color={T.rose}>Quiz 🎯</CardTitle>
-            <Quiz questions={QUIZ}/>
+            <Quiz questions={QUIZ} trackId="kivy"/>
           </Card>
         )}
       </div>

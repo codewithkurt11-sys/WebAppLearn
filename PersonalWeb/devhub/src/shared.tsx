@@ -4,6 +4,7 @@ export { T, DARK_COLORS, LIGHT_COLORS } from "./utils/theme";
 export { NAV }                          from "./utils/nav";
 export type { NavItem, NavGroup, AppCtxType } from "./types";
 export { AppCtx, useApp, RunCtx }       from "./contexts/AppContext";
+import { useProgressCtx }               from "./contexts/ProgressContext";
 
 // ─── LOCAL IMPORTS ─────────────────────────────────────────────────
 import type { ReactNode } from "react";
@@ -485,16 +486,24 @@ export function PageHeader({ eyebrow, title, sub, color }: { eyebrow: string; ti
 }
 
 // ─── QUIZ ─────────────────────────────────────────────────────────
-export function Quiz({ questions }: { questions: Question[] }) {
+export function Quiz({ questions, trackId }: { questions: Question[]; trackId?: string }) {
   const isMobile = useWindowWidth() < 900;
   const [idx, setIdx]       = useState(0);
   const [score, setScore]   = useState(0);
   const [chosen, setChosen] = useState<number | null>(null);
   const [done, setDone]     = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const { saveProgress }    = useProgressCtx();
   const q = questions[idx];
   const answer = (i: number) => { if (chosen !== null) return; setChosen(i); if (i === q.ans) setScore(s => s + 1); };
   const next   = () => { if (idx + 1 >= questions.length) { setDone(true); return; } setIdx(i => i + 1); setChosen(null); };
-  const reset  = () => { setIdx(0); setScore(0); setChosen(null); setDone(false); };
+  const reset  = () => { setIdx(0); setScore(0); setChosen(null); setDone(false); setSaved(false); };
+  if (done && !saved && trackId) {
+    setSaved(true);
+    const passed = score >= Math.ceil(questions.length / 2);
+    const pct = Math.round((score / questions.length) * 100);
+    saveProgress(trackId, passed, pct);
+  }
 
   if (done) return (
     <div style={{ textAlign: "center", padding: "28px 0" }}>
@@ -505,6 +514,7 @@ export function Quiz({ questions }: { questions: Question[] }) {
       <div style={{ fontSize: 12.5, color: T.muted2, marginBottom: 20 }}>
         {score === questions.length ? "Perfect score! 🎉" : score >= questions.length / 2 ? "Good work — review the misses." : "Keep practicing — you've got this."}
       </div>
+      {trackId && <div style={{ fontSize: 11, color: T.green, fontFamily: "'Fira Code',monospace", marginBottom: 16, letterSpacing: "0.5px" }}>✓ progress saved</div>}
       <button onClick={reset} style={{ padding: "8px 22px", background: "rgba(124,109,250,.12)", border: `1px solid rgba(124,109,250,.25)`, borderRadius: 8, color: T.accent, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
         Try again
       </button>

@@ -1387,7 +1387,7 @@ export default function HTMLCSs() {
         </p>
         <TabBar tabs={TABS} active={tab} onChange={setTab}/>
         {tab === "quiz"
-          ? <Card><CardTitle color={T.amber}>🎯 HTML & CSS Quiz</CardTitle><Quiz questions={QUIZ}/></Card>
+          ? <Card><CardTitle color={T.amber}>🎯 HTML & CSS Quiz</CardTitle><Quiz questions={QUIZ} trackId="html-css"/></Card>
           : content[tab]
         }
       </div>

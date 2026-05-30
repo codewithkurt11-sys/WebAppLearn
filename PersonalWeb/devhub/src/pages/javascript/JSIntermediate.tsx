@@ -425,7 +425,7 @@ export default function JSIntermediate() {
         {tab === "storage"       && <TabStorage/>}
         {tab === "regex"         && <TabRegex/>}
         {tab === "patterns"      && <TabPatterns/>}
-        {tab === "quiz"          && <Card><CardTitle color={T.amber}>Quiz — JavaScript Intermediate</CardTitle><Quiz questions={QUIZ}/></Card>}
+        {tab === "quiz"          && <Card><CardTitle color={T.amber}>Quiz — JavaScript Intermediate</CardTitle><Quiz questions={QUIZ} trackId="js-inter"/></Card>}
       </div>
     </div>
   );

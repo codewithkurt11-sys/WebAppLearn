@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { T, DARK_COLORS, LIGHT_COLORS, AppCtx, RunCtx, useApp, useWindowWidth } from "./shared";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ProgressProvider } from "./contexts/ProgressContext";
 import { Sidebar } from "./layouts/Sidebar";
 import { TopBar }  from "./layouts/TopBar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -162,9 +163,11 @@ function InnerApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <ErrorBoundary>
-        <InnerApp/>
-      </ErrorBoundary>
+      <ProgressProvider>
+        <ErrorBoundary>
+          <InnerApp/>
+        </ErrorBoundary>
+      </ProgressProvider>
     </AuthProvider>
   );
 }

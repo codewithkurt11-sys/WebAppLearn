@@ -1,4 +1,5 @@
 import { T, useApp, useWindowWidth } from "../shared";
+import { useProgressCtx } from "../contexts/ProgressContext";
 
 function StatCard({ value, label, color }: { value: string; label: string; color?: string }) {
   const isMobile = useWindowWidth() < 900;
@@ -15,8 +16,8 @@ function StatCard({ value, label, color }: { value: string; label: string; color
   );
 }
 
-function TrackCard({ id, icon, name, desc, tag, color, done, progress }: {
-  id:string; icon:string; name:string; desc:string; tag:string; color:string; done?:boolean; progress?:number;
+function TrackCard({ id, icon, name, desc, tag, color, done, scorePercent }: {
+  id:string; icon:string; name:string; desc:string; tag:string; color:string; done:boolean; scorePercent:number|null;
 }) {
   const { setPage } = useApp();
   return (
@@ -35,9 +36,9 @@ function TrackCard({ id, icon, name, desc, tag, color, done, progress }: {
       <div style={{ fontSize:20, marginBottom:8 }}>{icon}</div>
       <div style={{ fontWeight:700, fontSize:13, marginBottom:4, color:T.text }}>{name}</div>
       <div style={{ fontSize:11, color:T.muted, lineHeight:1.55, marginBottom:10 }}>{desc}</div>
-      {progress !== undefined && (
+      {scorePercent !== null && scorePercent > 0 && (
         <div style={{ height:3, background:T.border, borderRadius:2, overflow:"hidden", marginBottom:8 }}>
-          <div style={{ height:"100%", borderRadius:2, width:`${progress}%`, background:`linear-gradient(90deg,${color},${color}88)`, transition:"width .6s ease" }}/>
+          <div style={{ height:"100%", borderRadius:2, width:`${scorePercent}%`, background:`linear-gradient(90deg,${color},${color}88)`, transition:"width .6s ease" }}/>
         </div>
       )}
       <div style={{ fontSize:9, fontFamily:"'Fira Code',monospace", color, letterSpacing:"1px", textTransform:"uppercase" }}>{tag}</div>
@@ -45,15 +46,15 @@ function TrackCard({ id, icon, name, desc, tag, color, done, progress }: {
   );
 }
 
-const TRACKS = [
-  { id:"py-basics",    icon:"λ",  name:"Python Basics",    desc:"Variables, loops, functions, classes, errors, modules",  tag:"beginner · 10 tabs",   color:"#7c6dfa", done:true,  progress:100 },
-  { id:"py-inter",     icon:"λ",  name:"Python Inter.",    desc:"Files, regex, OOP deep dive, decorators, testing",        tag:"intermediate",          color:"#7c6dfa",             progress:0   },
-  { id:"py-adv",       icon:"λ",  name:"Python Advanced",  desc:"Async/await, generators, type hints, metaclasses",        tag:"advanced",              color:"#7c6dfa",             progress:0   },
-  { id:"flask-basics", icon:"{ }",name:"Flask",             desc:"Routes, templates, APIs, databases, authentication",     tag:"basics → expert",      color:"#34d399",             progress:0   },
-  { id:"js-basics",    icon:"⟩",  name:"JavaScript",        desc:"DOM, events, fetch API, ES6+ modern JS",                 tag:"beginner · 2 levels",  color:"#fbbf24",             progress:0   },
-  { id:"tkinter",      icon:"□",  name:"Tkinter",           desc:"Desktop GUI apps using Python's built-in toolkit",       tag:"beginner",             color:"#38bdf8",             progress:0   },
-  { id:"kivy",         icon:"◱",  name:"Kivy",              desc:"Cross-platform mobile & desktop apps with Python",       tag:"beginner",             color:"#fb7185",             progress:0   },
-  { id:"cheatsheet",   icon:"#",  name:"Cheatsheets",       desc:"Quick-reference cards for Python, JS & Flask",           tag:"searchable · filterable",color:"#34d399",           progress:0  },
+const TRACK_DEFS = [
+  { id:"py-basics",    icon:"λ",   name:"Python Basics",    desc:"Variables, loops, functions, classes, errors, modules",  tag:"beginner · 10 tabs",   color:"#7c6dfa" },
+  { id:"py-inter",     icon:"λ",   name:"Python Inter.",    desc:"Files, regex, OOP deep dive, decorators, testing",        tag:"intermediate",          color:"#7c6dfa" },
+  { id:"py-adv",       icon:"λ",   name:"Python Advanced",  desc:"Async/await, generators, type hints, metaclasses",        tag:"advanced",              color:"#7c6dfa" },
+  { id:"flask-basics", icon:"{ }", name:"Flask",             desc:"Routes, templates, APIs, databases, authentication",     tag:"basics → expert",      color:"#34d399" },
+  { id:"js-basics",    icon:"⟩",   name:"JavaScript",        desc:"DOM, events, fetch API, ES6+ modern JS",                 tag:"beginner · 2 levels",  color:"#fbbf24" },
+  { id:"tkinter",      icon:"□",   name:"Tkinter",           desc:"Desktop GUI apps using Python's built-in toolkit",       tag:"beginner",             color:"#38bdf8" },
+  { id:"kivy",         icon:"◱",   name:"Kivy",              desc:"Cross-platform mobile & desktop apps with Python",       tag:"beginner",             color:"#fb7185" },
+  { id:"cheatsheet",   icon:"#",   name:"Cheatsheets",       desc:"Quick-reference cards for Python, JS & Flask",           tag:"searchable · filterable", color:"#34d399" },
 ];
 
 const QUICK_LINKS = [
@@ -67,6 +68,12 @@ export default function Dashboard() {
   const { setPage } = useApp();
   const isMobile    = useWindowWidth() < 900;
   const pad         = isMobile ? "0 16px" : "0 24px";
+  const { progress, loading } = useProgressCtx();
+
+  const trackIds = TRACK_DEFS.filter(t => t.id !== "cheatsheet").map(t => t.id);
+  const completedCount = trackIds.filter(id => progress[id]?.completed).length;
+  const quizzesTaken   = trackIds.filter(id => progress[id]?.score !== null && progress[id]?.score !== undefined).length;
+  const pct = trackIds.length > 0 ? Math.round((completedCount / trackIds.length) * 100) : 0;
 
   return (
     <div>
@@ -84,8 +91,6 @@ export default function Dashboard() {
         <p style={{ fontSize: isMobile ? 12.5 : 13.5, color:T.muted2, lineHeight:1.7, maxWidth:520, marginBottom:22 }}>
           Python, Flask, JavaScript, GUI frameworks and more. Structured guides, interactive quizzes, syntax-highlighted examples, and quick-reference cheatsheets.
         </p>
-
-        {/* Quick-action buttons */}
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
           <button onClick={() => setPage("roadmap")} style={{
             background:T.accent, color:"#fff", border:"none",
@@ -110,13 +115,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────── */}
-      <div style={{ padding:`0 ${isMobile?"16px":"24px"} 24px`, display:"grid", gridTemplateColumns: isMobile ? "repeat(3,1fr)" : "repeat(5,1fr)", gap: isMobile ? 7 : 10 }}>
-        <StatCard value="10+"  label="Topics"           color={T.accent}/>
-        <StatCard value="80+"  label="Code Examples"    color={T.green}/>
-        <StatCard value="24+"  label="Quiz Questions"   color={T.amber}/>
-        <StatCard value="200+" label="Cheatsheet Cards" color={T.sky}/>
-        <StatCard value="∞"    label="Learning"         color={T.rose}/>
+      {/* ── My Progress ─────────────────────────────────────────── */}
+      <div style={{ padding:`0 ${isMobile?"16px":"24px"} 24px`, display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap: isMobile ? 7 : 10 }}>
+        <StatCard value={loading ? "…" : String(completedCount)} label="Tracks Done"   color={T.accent}/>
+        <StatCard value={loading ? "…" : String(quizzesTaken)}   label="Quizzes Taken" color={T.green}/>
+        <StatCard value={loading ? "…" : `${pct}%`}              label="Completion"    color={T.amber}/>
       </div>
 
       {/* ── Getting Started banner ──────────────────────────────── */}
@@ -148,10 +151,21 @@ export default function Dashboard() {
       <div style={{ padding:`0 ${isMobile?"16px":"24px"}`, marginBottom:14, display:"flex", alignItems:"center", gap:12 }}>
         <div style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontWeight:700, fontSize:11, color:T.muted, textTransform:"uppercase", letterSpacing:"2px", whiteSpace:"nowrap" }}>Learning Tracks</div>
         <div style={{ flex:1, height:1, background:T.border }}/>
-        <div style={{ fontSize:10, fontFamily:"'Fira Code',monospace", color:T.muted }}>8 tracks</div>
+        <div style={{ fontSize:10, fontFamily:"'Fira Code',monospace", color:T.muted }}>{TRACK_DEFS.length} tracks</div>
       </div>
       <div style={{ padding:`0 ${isMobile?"16px":"24px"} 32px`, display:"grid", gridTemplateColumns: isMobile ? "repeat(auto-fill,minmax(145px,1fr))" : "repeat(auto-fill,minmax(175px,1fr))", gap:10 }}>
-        {TRACKS.map(t => <TrackCard key={t.id} {...t}/>)}
+        {TRACK_DEFS.map(t => {
+          const p = progress[t.id];
+          const scorePercent = (p?.score != null) ? Math.min(100, p.score) : null;
+          return (
+            <TrackCard
+              key={t.id}
+              {...t}
+              done={p?.completed ?? false}
+              scorePercent={scorePercent}
+            />
+          );
+        })}
       </div>
 
       {/* ── Tips ────────────────────────────────────────────────── */}
@@ -163,7 +177,7 @@ export default function Dashboard() {
         <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap:10 }}>
           {[
             { icon:"▶", color:T.green, title:"Run examples", body:"Click the ▶ run button on Python and JavaScript blocks to execute code right in your browser — no setup needed." },
-            { icon:"🎯", color:T.accent, title:"Take quizzes", body:"Test your knowledge at the end of every topic. Track your score and revisit anything that didn't stick." },
+            { icon:"🎯", color:T.accent, title:"Take quizzes", body:"Test your knowledge at the end of every topic. Your score is saved to your account automatically." },
             { icon:"≡", color:T.amber, title:"Use cheatsheets", body:"Quick-reference cards for Python, JS, and Flask. Search or filter by language for fast lookup." },
           ].map((tip, i) => (
             <div key={i} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 16px" }}>
@@ -175,15 +189,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── codewithkurt ────────────────────────────────────────── */}
-      <div style={{
-        fontSize: 10,
-        fontFamily: "'Fira Code', monospace",
-        color: T.muted,
-        letterSpacing: "2px",
-        textAlign: "center",
-        padding: "20px 0 30px",
-      }}>
+      <div style={{ fontSize:10, fontFamily:"'Fira Code',monospace", color:T.muted, letterSpacing:"2px", textAlign:"center", padding:"20px 0 30px" }}>
         // codewithkurt
       </div>
     </div>

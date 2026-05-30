@@ -187,8 +187,8 @@ function detectRunnability(code: string, lang: string): "runnable" | "terminal" 
 
 const COLLAPSE_THRESHOLD = 20;
 
-export function CodeBlock({ code, lang = "py", title, showLines = false, runnable }: {
-  code: string; lang?: string; title?: string; showLines?: boolean; runnable?: boolean;
+export function CodeBlock({ code, lang = "py", title, showLines = false, runnable, explanation }: {
+  code: string; lang?: string; title?: string; showLines?: boolean; runnable?: boolean; explanation?: string[];
 }) {
   const isMobile   = useWindowWidth() < 900;
   const canRunPage = useContext(RunCtx);
@@ -196,6 +196,7 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   const [output, setOutput]     = useState<string | null>(null);
   const [execTime, setExecTime] = useState<string | null>(null);
   const [running, setRunning]   = useState(false);
+  const [explainOpen, setExplainOpen] = useState(false);
   const [pyReady, setPyReady]   = useState(_pyodideReady);
 
   const lines = code.trim().split("\n");
@@ -270,7 +271,8 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   const displayLines = collapsed ? lines.slice(0, COLLAPSE_THRESHOLD) : lines;
 
   return (
-    <div style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", margin: "12px 0", fontSize: isMobile ? 11.5 : 12.5 }}>
+    <div style={{ margin: "12px 0" }}>
+    <div style={{ background: T.codeBg, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", fontSize: isMobile ? 11.5 : 12.5 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", background: T.surface2, borderBottom: `1px solid ${T.border}` }}>
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#ff5f57", display: "inline-block" }}/>
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#ffbd2e", display: "inline-block" }}/>
@@ -306,7 +308,7 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
         {lines.length > COLLAPSE_THRESHOLD && (
           <div style={{ position: "relative" }}>
             {collapsed && (
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48, background: `linear-gradient(transparent, ${T.bg2})`, pointerEvents: "none" }}/>
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48, background: `linear-gradient(transparent, ${T.codeBg})`, pointerEvents: "none" }}/>
             )}
             <div style={{ display: "flex", justifyContent: "center", paddingTop: collapsed ? 8 : 4 }}>
               <button
@@ -343,6 +345,39 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
         </div>
       )}
     </div>
+    {explanation && explanation.length > 0 && (
+      <div>
+        <button
+          onClick={() => setExplainOpen(o => !o)}
+          style={{
+            marginTop: 6, display: "flex", alignItems: "center", gap: 5,
+            background: "transparent", border: `1px solid ${T.border2}`,
+            borderRadius: 6, color: T.muted2, fontSize: 10.5,
+            fontFamily: "'Fira Code',monospace", padding: "4px 11px",
+            cursor: "pointer", transition: "all .15s",
+          }}
+          onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = T.accent; el.style.color = T.accent; }}
+          onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = T.border2; el.style.color = T.muted2; }}
+        >
+          {explainOpen ? "▼ Hide explanation" : "▶ Explain this code"}
+        </button>
+        <div style={{ maxHeight: explainOpen ? "3000px" : "0", overflow: "hidden", transition: "max-height .35s cubic-bezier(.4,0,.2,1)" }}>
+          <div style={{ background: T.surface2, borderRadius: 10, padding: "12px 16px", marginTop: 8 }}>
+            {code.trim().split("\n").map((line, i) => {
+              const allLines = code.trim().split("\n");
+              return (
+                <div key={i} style={{ display: "flex", gap: 12, padding: "6px 0", borderBottom: i < allLines.length - 1 ? `1px solid ${T.border}` : "none", alignItems: "flex-start" }}>
+                  <span style={{ color: T.muted, minWidth: 22, fontSize: 10, fontFamily: "'Fira Code',monospace", flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
+                  <code style={{ fontFamily: "'Fira Code',monospace", fontSize: 10.5, color: T.muted2, flex: "0 0 44%", whiteSpace: "pre", overflow: "hidden", textOverflow: "ellipsis" }}>{line || " "}</code>
+                  <span style={{ fontSize: 12, color: T.text, flex: 1, lineHeight: 1.65 }}>{(explanation ?? [])[i] ?? ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+    </div>
   );
 }
 
@@ -366,7 +401,7 @@ export function InfoBox({ type = "info", children }: { type?: keyof typeof BOX_S
 export function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
   const isMobile = useWindowWidth() < 900;
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 13, padding: isMobile ? "14px 14px" : "18px 20px", marginBottom: 14, ...style }}>
+    <div className="wl-card" style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 13, padding: isMobile ? "14px 14px" : "18px 20px", marginBottom: 14, ...style }}>
       {children}
     </div>
   );
@@ -378,6 +413,42 @@ export function CardTitle({ children, color }: { children: ReactNode; color?: st
 // ─── INLINE CODE ──────────────────────────────────────────────────
 export function IC({ children, color }: { children: ReactNode; color?: string }) {
   return <code style={{ fontFamily: "'Fira Code',monospace", fontSize: 11, background: "rgba(124,109,250,.12)", color: color || T.accent, padding: "1px 6px", borderRadius: 4 }}>{children}</code>;
+}
+
+// ─── DEFINITION BOX ───────────────────────────────────────────────
+export function Def({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div style={{
+      background: "rgba(124,109,250,.07)",
+      borderLeft: `3px solid ${T.accent}`,
+      borderRadius: "0 8px 8px 0",
+      padding: "10px 16px",
+      marginBottom: 14,
+    }}>
+      <span style={{ fontSize: 9.5, color: T.accent, fontFamily: "'Fira Code',monospace", letterSpacing: "1.5px", fontWeight: 700 }}>DEFINITION · </span>
+      <strong style={{ fontSize: 12.5, color: T.text }}>{term}</strong>
+      <span style={{ fontSize: 12.5, color: T.muted2 }}>{" — "}{children}</span>
+    </div>
+  );
+}
+
+// ─── TRY IT YOURSELF ──────────────────────────────────────────────
+export function TryIt({ children }: { children: ReactNode }) {
+  return (
+    <div style={{
+      background: "rgba(52,211,153,.04)",
+      border: `1px solid rgba(52,211,153,.2)`,
+      borderRadius: 10,
+      padding: "12px 16px",
+      marginTop: 14,
+    }}>
+      <div style={{
+        fontSize: 9.5, color: T.green, fontFamily: "'Fira Code',monospace",
+        letterSpacing: "1.5px", fontWeight: 700, marginBottom: 7,
+      }}>✏  TRY IT YOURSELF</div>
+      <div style={{ fontSize: 12.5, color: T.muted2, lineHeight: 1.7 }}>{children}</div>
+    </div>
+  );
 }
 
 // ─── TAB BAR ──────────────────────────────────────────────────────

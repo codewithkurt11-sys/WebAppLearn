@@ -4,9 +4,9 @@ import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../contexts/AuthContext";
 
 const tagStyle = (tag?: string): { bg: string; color: string } => ({
-  beginner:     { bg: "rgba(56,189,248,.12)",  color: "#38bdf8" },
-  intermediate: { bg: "rgba(124,109,250,.12)", color: "#7c6dfa" },
-  advanced:     { bg: "rgba(251,113,133,.12)", color: "#fb7185" },
+  beginner:     { bg: "rgba(99,102,241,.12)",  color: "#6366f1" },
+  intermediate: { bg: "rgba(99,102,241,.12)",  color: "#6366f1" },
+  advanced:     { bg: "rgba(244,63,94,.12)",   color: "#f43f5e" },
 }[tag || ""] ?? { bg: "", color: "" });
 
 function SidebarFooter({ onShowAuth, isDark, onToggleTheme }: {
@@ -44,13 +44,13 @@ function SidebarFooter({ onShowAuth, isDark, onToggleTheme }: {
       <button
         onClick={onShowAuth}
         style={{
-          width: "100%", padding: "8px 12px", background: "rgba(124,109,250,.12)",
-          border: `1px solid rgba(124,109,250,.25)`, borderRadius: 8,
+          width: "100%", padding: "8px 12px", background: `rgba(99,102,241,.1)`,
+          border: `1px solid rgba(99,102,241,.25)`, borderRadius: 8,
           color: T.accent, fontSize: 11.5, fontWeight: 600,
           fontFamily: "'Bricolage Grotesque',sans-serif", cursor: "pointer", transition: "all .15s",
         }}
-        onMouseEnter={e => (e.currentTarget.style.background = "rgba(124,109,250,.2)")}
-        onMouseLeave={e => (e.currentTarget.style.background = "rgba(124,109,250,.12)")}
+        onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,.18)")}
+        onMouseLeave={e => (e.currentTarget.style.background = "rgba(99,102,241,.1)")}
       >
         Sign in to sync progress →
       </button>
@@ -143,10 +143,11 @@ export function Sidebar({ open, onClose, isMobile, onShowAuth, isDark, onToggleT
                     style={{
                       display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 14px",
                       border: "none", textAlign: "left",
-                      background: active ? T.surface2 : "transparent",
+                      background: active ? `${item.color}0d` : "transparent",
                       color: active ? T.text : T.muted2,
-                      fontSize: 12.5, fontWeight: 500,
+                      fontSize: 12.5, fontWeight: active ? 600 : 500,
                       borderLeft: active ? `2px solid ${item.color}` : "2px solid transparent",
+                      boxShadow: active ? `inset 0 0 24px ${item.color}14` : "none",
                       transition: "all .15s", cursor: "pointer",
                     }}
                     onMouseEnter={e => { if (!active)(e.currentTarget as HTMLElement).style.background = T.surface; }}

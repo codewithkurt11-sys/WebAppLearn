@@ -76,7 +76,9 @@ function PageRouter() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<PageSkeleton/>}>
-        {content}
+        <div key={page} className="wl-page">
+          {content}
+        </div>
       </Suspense>
     </ErrorBoundary>
   );
@@ -107,15 +109,19 @@ function InnerApp() {
         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=Fira+Code:wght@400;500&display=swap');
         :root { ${cssVars} }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { font-size: 14px; }
+        html { font-size: 14.5px; }
         body { background: var(--t-bg); color: var(--t-text); font-family: 'Bricolage Grotesque', sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .2s, color .2s; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--t-border2); border-radius: 2px; }
         * { scrollbar-width: thin; scrollbar-color: var(--t-border2) transparent; }
-        code, pre { font-family: 'Fira Code', monospace; }
+        code, pre { font-family: 'Fira Code', monospace; font-size: 13px; }
         button { cursor: pointer; font-family: inherit; }
         input, select, textarea { font-family: inherit; }
+        @keyframes pgFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .wl-page { animation: pgFade .22s ease both; }
+        .wl-card { transition: transform .18s ease, box-shadow .18s ease; }
+        .wl-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,.10); }
       `}</style>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)}/>}

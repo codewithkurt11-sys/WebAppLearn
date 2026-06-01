@@ -1,44 +1,44 @@
-import { Component, ReactNode, ErrorInfo } from "react";
+import { Component, type ReactNode, type ErrorInfo } from "react";
 import { T } from "../utils/theme";
 
-interface Props  { children: ReactNode; }
-interface State  { hasError: boolean; error: Error | null; }
+interface Props { children: ReactNode; }
+interface State { error: Error | null; }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null };
+  constructor(props: Props) {
+    super(props);
+    this.state = { error: null };
+  }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[ErrorBoundary]", error, info.componentStack);
+    console.error("[ErrorBoundary]", error, info);
   }
 
   render() {
-    if (this.state.hasError) {
+    if (this.state.error) {
       return (
-        <div style={{ padding: "60px 24px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <h2 style={{
-            fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800,
-            fontSize: 20, color: T.rose, marginBottom: 10,
-          }}>
-            Something went wrong
-          </h2>
-          <p style={{ fontSize: 12.5, color: T.muted2, lineHeight: 1.65, marginBottom: 20, fontFamily: "'Fira Code',monospace" }}>
-            {this.state.error?.message || "An unexpected error occurred."}
-          </p>
+        <div style={{ padding: "48px 24px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ fontSize: 36, marginBottom: 16 }}>⚠</div>
+          <div style={{
+            fontFamily: "'Bricolage Grotesque',sans-serif",
+            fontWeight: 800, fontSize: 18, marginBottom: 10,
+            color: T.rose, letterSpacing: "-0.5px",
+          }}>Something went wrong</div>
+          <div style={{ fontSize: 12.5, color: T.muted2, marginBottom: 20, lineHeight: 1.6 }}>
+            {this.state.error.message}
+          </div>
           <button
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={() => this.setState({ error: null })}
             style={{
-              padding: "8px 22px", background: "rgba(124,109,250,.1)",
-              border: `1px solid rgba(124,109,250,.25)`, borderRadius: 8,
-              color: T.accent, fontSize: 13, cursor: "pointer", fontWeight: 600,
+              padding: "8px 20px", background: T.surface,
+              border: `1px solid ${T.border2}`, borderRadius: 8,
+              color: T.text, fontSize: 12.5, cursor: "pointer",
             }}
-          >
-            Try again
-          </button>
+          >Try again</button>
         </div>
       );
     }

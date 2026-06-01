@@ -13,18 +13,11 @@ export default defineConfig({
   },
   root: path.resolve(__dirname),
   build: {
-    outDir: path.resolve(__dirname, "dist/public"),
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
   },
   server: {
-    port: Number(process.env.PORT) || 5173,
-    strictPort: true,
+    port: 5173,
     host: "0.0.0.0",
-    allowedHosts: true,
-  },
-  preview: {
-    port: Number(process.env.PORT) || 5173,
-    host: "0.0.0.0",
-    allowedHosts: true,
   },
 });

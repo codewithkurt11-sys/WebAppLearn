@@ -1,223 +1,261 @@
-import { T, PageHeader, useApp, useWindowWidth } from "../shared";
+import { Check, Lock } from "lucide-react";
+import { T } from "../utils/theme";
+import { useApp } from "../contexts/AppContext";
 import { useProgressCtx } from "../contexts/ProgressContext";
+import { useWindowWidth } from "../hooks/useWindowWidth";
 
 interface Step {
   id: string;
   title: string;
   desc: string;
-  icon: string;
-  color: string;
   skills: string[];
+  color: string;
 }
 
 const PHASES: { phase: string; color: string; steps: Step[] }[] = [
-  {
-    phase: "Phase 1 — Python Foundations",
-    color: T.accent,
-    steps: [
-      {
-        id: "py-basics", title: "Python Basics", icon: "🐍",
-        color: T.accent,
-        desc: "The building blocks of every Python program",
-        skills: ["Variables & Types", "Strings & f-strings", "Lists & Dicts", "If/Else", "Loops", "Functions", "Classes", "Exceptions", "Modules"],
-      },
-      {
-        id: "py-inter", title: "Python Intermediate", icon: "🐍",
-        color: T.accent,
-        desc: "Write cleaner, more powerful Python",
-        skills: ["Comprehensions", "Generators", "Decorators", "File I/O", "Regular Expressions", "OOP deep dive", "Context managers"],
-      },
-      {
-        id: "py-adv", title: "Python Advanced", icon: "🐍",
-        color: T.accent,
-        desc: "Expert-level Python patterns",
-        skills: ["Async/await", "Threading", "Type hints", "Metaclasses", "Design patterns", "Performance profiling"],
-      },
-    ],
-  },
-  {
-    phase: "Phase 2 — Web Development with Flask",
-    color: T.green,
-    steps: [
-      {
-        id: "flask-basics", title: "Flask Basics", icon: "🌶",
-        color: T.green,
-        desc: "Build your first web server in Python",
-        skills: ["Routes & views", "Request/Response", "Query params", "URL variables", "JSON APIs", "Debug mode", "testf.py explained"],
-      },
-      {
-        id: "flask-inter", title: "Flask Intermediate", icon: "🌶",
-        color: T.green,
-        desc: "Templates, forms, and databases",
-        skills: ["Jinja2 templates", "HTML forms", "SQLite + Flask", "Blueprints", "Error handling", "Flash messages", "Sessions"],
-      },
-      {
-        id: "flask-expert", title: "Flask Expert", icon: "🌶",
-        color: T.green,
-        desc: "Production-ready Flask applications",
-        skills: ["User auth & login", "SQLAlchemy ORM", "REST API design", "File uploads", "Deployment", "CORS & security"],
-      },
-    ],
-  },
-  {
-    phase: "Phase 3 — JavaScript & the Browser",
-    color: T.amber,
-    steps: [
-      {
-        id: "js-basics", title: "JavaScript Basics", icon: "⚡",
-        color: T.amber,
-        desc: "Make web pages interactive",
-        skills: ["Variables & types", "Functions & arrows", "DOM manipulation", "Events", "Arrays & objects", "fetch API", "Async/await"],
-      },
-      {
-        id: "js-inter", title: "JavaScript Intermediate", icon: "⚡",
-        color: T.amber,
-        desc: "Advanced JS patterns",
-        skills: ["Promises", "ES Modules", "Local Storage", "Regex", "Canvas API", "Web APIs"],
-      },
-    ],
-  },
-  {
-    phase: "Phase 4 — GUI, Scraping & Databases",
-    color: T.sky,
-    steps: [
-      {
-        id: "tkinter", title: "Tkinter", icon: "🖥",
-        color: T.sky,
-        desc: "Build desktop apps with Python",
-        skills: ["Widgets", "Layout managers", "Events", "StringVar / IntVar", "Full app patterns"],
-      },
-      {
-        id: "kivy", title: "Kivy", icon: "📱",
-        color: T.rose,
-        desc: "Cross-platform mobile & desktop",
-        skills: ["KV language", "Layouts", "Touch events", "Animations", "APK building"],
-      },
-      {
-        id: "scraping", title: "Web Scraping", icon: "🕷",
-        color: T.muted2,
-        desc: "Extract data from any website",
-        skills: ["requests library", "BeautifulSoup", "Parsing HTML", "Following links", "Saving to CSV/JSON"],
-      },
-      {
-        id: "sqlite", title: "SQLite", icon: "🗄",
-        color: T.muted2,
-        desc: "Persistent data storage in Python",
-        skills: ["CREATE / SELECT / INSERT", "WHERE & ORDER BY", "JOINS", "Python sqlite3 module", "Flask integration"],
-      },
-    ],
-  },
+  { phase: "Phase 1 — Python Foundations", color: T.accent, steps: [
+    { id: "py-basics", title: "Python Basics",       color: T.accent, desc: "The building blocks of every Python program",
+      skills: ["Variables & Types","Strings","Lists & Dicts","Loops","Functions","Classes","Modules"] },
+    { id: "py-inter",  title: "Python Intermediate", color: T.accent, desc: "Write cleaner, more powerful Python",
+      skills: ["Comprehensions","Generators","Decorators","File I/O","Regex","OOP deep dive"] },
+    { id: "py-adv",    title: "Python Advanced",      color: T.accent, desc: "Expert-level Python patterns",
+      skills: ["Async/await","Threading","Type hints","Metaclasses","Design patterns"] },
+  ]},
+  { phase: "Phase 2 — Web Development with Flask", color: T.green, steps: [
+    { id: "flask-basics", title: "Flask Basics",       color: T.green, desc: "Build your first web server in Python",
+      skills: ["Routes & views","Request/Response","JSON APIs","Debug mode"] },
+    { id: "flask-inter",  title: "Flask Intermediate", color: T.green, desc: "Templates, forms, and databases",
+      skills: ["Jinja2 templates","HTML forms","SQLite + Flask","Blueprints","Sessions"] },
+    { id: "flask-expert", title: "Flask Expert",        color: T.green, desc: "Production-ready Flask applications",
+      skills: ["User auth","SQLAlchemy","REST API design","File uploads","Deployment"] },
+  ]},
+  { phase: "Phase 3 — JavaScript & the Browser", color: T.amber, steps: [
+    { id: "js-basics", title: "JavaScript Basics",       color: T.amber, desc: "Make web pages interactive",
+      skills: ["Variables","DOM manipulation","Events","fetch API","Async/await"] },
+    { id: "js-inter",  title: "JavaScript Intermediate", color: T.amber, desc: "Advanced JS patterns",
+      skills: ["Promises","ES Modules","Local Storage","Canvas API"] },
+  ]},
+  { phase: "Phase 4 — GUI, Scraping & Databases", color: T.sky, steps: [
+    { id: "tkinter",  title: "Tkinter",      color: T.sky,    desc: "Desktop GUI apps with Python",
+      skills: ["Widgets","Layout managers","Events","Full app patterns"] },
+    { id: "kivy",     title: "Kivy",          color: T.rose,   desc: "Cross-platform mobile & desktop",
+      skills: ["KV language","Layouts","Touch events","APK building"] },
+    { id: "scraping", title: "Web Scraping",  color: T.muted2, desc: "Extract data from any website",
+      skills: ["requests","BeautifulSoup","Parsing HTML","Saving CSV"] },
+    { id: "sqlite",   title: "SQLite",         color: T.muted2, desc: "Persistent data storage",
+      skills: ["SELECT/INSERT","WHERE & ORDER","JOINS","sqlite3 module"] },
+  ]},
 ];
 
-function StepCard({ step, isDone }: { step: Step; isDone: boolean }) {
+const ALL_STEPS = PHASES.flatMap(p => p.steps);
+
+export default function Roadmap() {
   const { setPage } = useApp();
-  const badge = isDone
-    ? { label:"✓ Done",    bg:"rgba(52,211,153,.12)",  color:T.green,  border:"rgba(52,211,153,.3)"  }
-    : { label:"→ Up Next", bg:"rgba(124,109,250,.12)", color:T.accent, border:"rgba(124,109,250,.3)" };
+  const { progress } = useProgressCtx();
+  const isMobile = useWindowWidth() < 900;
+
+  const doneCount = ALL_STEPS.filter(s => progress[s.id]?.completed).length;
+  const total = ALL_STEPS.length;
+  const pct = total ? Math.round((doneCount / total) * 100) : 0;
+
+  const firstUndone = ALL_STEPS.find(s => !progress[s.id]?.completed)?.id;
+
+  let stepIndex = -1;
 
   return (
-    <div
-      onClick={() => setPage(step.id)}
-      style={{
-        background:T.surface, border:`1px solid ${isDone ? step.color : `${step.color}44`}`,
-        borderRadius:14, padding:"18px 20px",
-        cursor:"pointer", transition:"all .2s",
-        position:"relative", overflow:"hidden",
-      }}
-      onMouseEnter={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor=step.color; el.style.transform="translateY(-2px)"; }}
-      onMouseLeave={e => { const el=e.currentTarget as HTMLElement; el.style.borderColor=isDone ? step.color : `${step.color}44`; el.style.transform=""; }}
-    >
-      {isDone && (
-        <div style={{ position:"absolute", top:0, right:0, width:80, height:80, background:`radial-gradient(circle at top right, ${step.color}18, transparent 70%)`, pointerEvents:"none" }}/>
-      )}
-      <div style={{ display:"flex", alignItems:"flex-start", gap:12, marginBottom:12 }}>
-        <span style={{ fontSize:24, flexShrink:0 }}>{step.icon}</span>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontWeight:700, fontSize:14, marginBottom:3 }}>{step.title}</div>
-          <div style={{ fontSize:11.5, color:T.muted2, lineHeight:1.5 }}>{step.desc}</div>
+    <div style={{ padding: isMobile ? "20px 14px" : "32px 28px" }}>
+      <style>{`
+        @keyframes cifPulseRing {
+          0% { box-shadow: 0 0 0 0 var(--t-accent); }
+          70% { box-shadow: 0 0 0 10px transparent; }
+          100% { box-shadow: 0 0 0 0 transparent; }
+        }
+      `}</style>
+
+      {/* Header + progress */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          fontFamily: "'Bricolage Grotesque',sans-serif",
+          fontWeight: 800, fontSize: isMobile ? 24 : 32,
+          letterSpacing: "-1px", marginBottom: 6,
+        }}>Roadmap</div>
+        <div style={{
+          fontFamily: "'Fira Code',monospace",
+          fontSize: 12, color: T.muted2, marginBottom: 18,
+        }}>// {doneCount} of {total} milestones complete</div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, height: 6, background: T.border, borderRadius: 3, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", width: `${pct}%`, borderRadius: 3,
+              background: `linear-gradient(90deg, ${T.accent}, ${T.rose})`,
+              transition: "width .8s ease",
+            }} />
+          </div>
+          <div style={{
+            fontFamily: "'Bricolage Grotesque',sans-serif",
+            fontWeight: 800, fontSize: 16, color: T.text,
+            minWidth: 44, textAlign: "right",
+          }}>{pct}%</div>
         </div>
-        <span style={{ flexShrink:0, fontSize:9, fontFamily:"'Fira Code',monospace", letterSpacing:"1px", textTransform:"uppercase", padding:"3px 8px", borderRadius:5, background:badge.bg, color:badge.color, border:`1px solid ${badge.border}`, whiteSpace:"nowrap" }}>
-          {badge.label}
-        </span>
       </div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:5 }}>
-        {step.skills.map((skill, i) => (
-          <span key={i} style={{ fontSize:10, fontFamily:"'Fira Code',monospace", padding:"2px 8px", borderRadius:4, background:T.bg2, color:T.muted2, border:`1px solid ${T.border2}` }}>{skill}</span>
+
+      {/* Timeline */}
+      <div style={{ position: "relative" }}>
+        {/* center line */}
+        <div aria-hidden style={{
+          position: "absolute",
+          left: isMobile ? 19 : "50%",
+          transform: isMobile ? "none" : "translateX(-1px)",
+          top: 0, bottom: 0, width: 2,
+          background: `linear-gradient(to bottom, ${T.accent}, ${T.border} 90%)`,
+          borderRadius: 1,
+        }} />
+
+        {PHASES.map(phase => (
+          <div key={phase.phase} style={{ position: "relative" }}>
+            {/* Phase divider */}
+            <div style={{
+              position: "relative",
+              display: "flex", alignItems: "center", gap: 14,
+              padding: "26px 0 18px",
+              margin: isMobile ? "0 0 0 0" : "0",
+            }}>
+              <div style={{
+                flex: 1, height: 1,
+                background: `linear-gradient(90deg, transparent, ${phase.color}55)`,
+              }} />
+              <div style={{
+                fontFamily: "'Bricolage Grotesque',sans-serif",
+                fontWeight: 800, fontSize: 11.5,
+                textTransform: "uppercase", letterSpacing: "2px",
+                color: phase.color, textAlign: "center",
+                padding: "4px 12px",
+                background: T.bg,
+                borderRadius: 6,
+              }}>{phase.phase}</div>
+              <div style={{
+                flex: 1, height: 1,
+                background: `linear-gradient(90deg, ${phase.color}55, transparent)`,
+              }} />
+            </div>
+
+            {phase.steps.map(step => {
+              stepIndex++;
+              const p = progress[step.id];
+              const done = !!p?.completed;
+              const current = !done && step.id === firstUndone;
+              const locked = !done && !current;
+              const sideRight = isMobile ? true : (stepIndex % 2 === 1);
+
+              return (
+                <TimelineRow
+                  key={step.id}
+                  step={step}
+                  done={done}
+                  current={current}
+                  locked={locked}
+                  isMobile={isMobile}
+                  sideRight={sideRight}
+                  onClick={() => setPage(step.id)}
+                />
+              );
+            })}
+          </div>
         ))}
-      </div>
-      <div style={{ marginTop:12, fontSize:10.5, fontFamily:"'Fira Code',monospace", color:step.color, letterSpacing:"1px" }}>
-        {isDone ? "// review →" : "// start →"}
       </div>
     </div>
   );
 }
 
-export default function Roadmap() {
-  const isMobile = useWindowWidth() < 900;
-  const { progress, loading } = useProgressCtx();
+function TimelineRow({
+  step, done, current, locked, isMobile, sideRight, onClick,
+}: {
+  step: Step; done: boolean; current: boolean; locked: boolean;
+  isMobile: boolean; sideRight: boolean; onClick: () => void;
+}) {
+  const nodeColor = done ? T.green : current ? T.accent : T.border2;
+  const nodeFill  = done ? T.green : current ? T.accent : T.surface2;
 
-  const allSteps = PHASES.flatMap(p => p.steps);
-  const doneCount = allSteps.filter(s => progress[s.id]?.completed).length;
-  const totalCount = allSteps.length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const cardCol: React.CSSProperties = isMobile
+    ? { marginLeft: 44, marginRight: 0 }
+    : sideRight
+      ? { marginLeft: "calc(50% + 28px)", marginRight: 0 }
+      : { marginLeft: 0, marginRight: "calc(50% + 28px)", textAlign: "right" };
 
   return (
-    <div>
-      <PageHeader eyebrow="Learning Path" title="Your Roadmap" sub="From Python basics to full-stack Flask apps — track your journey" color={T.sky}/>
-      <div style={{ paddingBottom:40, paddingLeft: isMobile?16:24, paddingRight: isMobile?16:24 }}>
-
-        {/* Overall progress */}
-        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:13, padding:"18px 20px", marginBottom:28 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-            <span style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontWeight:700, fontSize:13 }}>Overall Progress</span>
-            <span style={{ fontFamily:"'Fira Code',monospace", fontSize:11, color:T.accent }}>
-              {loading ? "…" : `${doneCount}/${totalCount} steps · ${pct}%`}
-            </span>
-          </div>
-          <div style={{ height:6, background:T.border, borderRadius:4, overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:4, width:`${pct}%`, background:`linear-gradient(90deg,${T.accent},${T.green})`, transition:"width .6s ease" }}/>
-          </div>
-          <div style={{ display:"flex", gap:16, marginTop:14, flexWrap:"wrap" }}>
-            {[
-              { label:"Done",    color:T.green,  count: doneCount                    },
-              { label:"To Do",   color:T.accent, count: totalCount - doneCount       },
-            ].map(item => (
-              <div key={item.label} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{ width:8, height:8, borderRadius:"50%", background:item.color, display:"inline-block" }}/>
-                <span style={{ fontSize:11, color:T.muted2 }}>{item.count} {item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Phases */}
-        {PHASES.map((phase, pi) => (
-          <div key={pi} style={{ marginBottom:32 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
-              <div style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontWeight:800, fontSize:12, color:phase.color, textTransform:"uppercase", letterSpacing:"1.5px", whiteSpace:"nowrap" }}>
-                {phase.phase}
-              </div>
-              <div style={{ flex:1, height:1, background:`linear-gradient(90deg,${phase.color}44,transparent)` }}/>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-              {phase.steps.map((step, si) => (
-                <div key={si} style={{ display:"flex", flexDirection:"column" }}>
-                  {si > 0 && (
-                    <div style={{ display:"flex", alignItems:"center", marginBottom:8, paddingLeft:24 }}>
-                      <div style={{ width:1, height:12, background:`${phase.color}33` }}/>
-                    </div>
-                  )}
-                  <StepCard step={step} isDone={!loading && (progress[step.id]?.completed ?? false)}/>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        <div style={{ background:"rgba(124,109,250,.06)", border:`1px solid rgba(124,109,250,.2)`, borderRadius:10, padding:"14px 18px", fontSize:12.5, color:T.muted2, lineHeight:1.65 }}>
-          💡 <strong style={{ color:T.text }}>Study tip:</strong> Don't try to memorize syntax — try to understand <em>why</em> things work the way they do. The quiz at the end of each module will tell you honestly what you actually know. Move on only when the quiz feels easy, not just possible.
-        </div>
+    <div style={{ position: "relative", padding: "12px 0" }}>
+      {/* node */}
+      <div style={{
+        position: "absolute",
+        left: isMobile ? 12 : "50%",
+        transform: isMobile ? "none" : "translateX(-50%)",
+        top: 22,
+        width: 18, height: 18, borderRadius: "50%",
+        background: nodeFill,
+        border: `2px solid ${T.bg}`,
+        boxShadow: current ? `0 0 0 0 ${T.accent}` : `0 0 0 1px ${nodeColor}`,
+        animation: current ? "cifPulseRing 1.6s ease-out infinite" : "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 2,
+      }}>
+        {done && <Check size={11} strokeWidth={3} color={T.bg} />}
+        {locked && <Lock size={9} strokeWidth={2.5} color={T.muted} />}
       </div>
+
+      {/* card */}
+      <button
+        onClick={onClick}
+        style={{
+          ...cardCol,
+          display: "block", width: isMobile ? "auto" : "calc(50% - 28px)",
+          background: T.surface, border: `1px solid ${T.border}`,
+          borderRadius: 12, padding: "14px 16px",
+          cursor: "pointer", color: T.text,
+          textAlign: cardCol.textAlign,
+          transition: "all .2s",
+        }}
+        onMouseEnter={e => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.transform = "translateY(-2px)";
+          el.style.boxShadow = `0 10px 28px ${step.color}22`;
+          el.style.borderColor = step.color;
+        }}
+        onMouseLeave={e => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.transform = "";
+          el.style.boxShadow = "none";
+          el.style.borderColor = T.border;
+        }}
+      >
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: 6, gap: 8, flexDirection: cardCol.textAlign === "right" ? "row-reverse" : "row",
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5, color: T.text }}>{step.title}</div>
+          <div style={{
+            fontSize: 9, fontFamily: "'Fira Code',monospace",
+            letterSpacing: "1px", textTransform: "uppercase",
+            padding: "2px 7px", borderRadius: 4,
+            background: done ? `${T.green}1a` : current ? `${T.accent}1a` : `${T.muted}1a`,
+            color: done ? T.green : current ? T.accent : T.muted2,
+          }}>{done ? "done" : current ? "now" : "next"}</div>
+        </div>
+        <div style={{ fontSize: 11.5, color: T.muted2, lineHeight: 1.5, marginBottom: 10 }}>{step.desc}</div>
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: 5,
+          justifyContent: cardCol.textAlign === "right" ? "flex-end" : "flex-start",
+        }}>
+          {step.skills.slice(0, 5).map(s => (
+            <span key={s} style={{
+              fontSize: 10, padding: "2px 7px",
+              background: T.bg2, border: `1px solid ${T.border}`,
+              borderRadius: 4, color: T.muted2,
+              fontFamily: "'Fira Code',monospace",
+            }}>{s}</span>
+          ))}
+        </div>
+      </button>
     </div>
   );
 }

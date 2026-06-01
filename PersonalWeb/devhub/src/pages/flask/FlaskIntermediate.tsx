@@ -418,7 +418,9 @@ def risky():
 }
 
 export default function FlaskIntermediate() {
-  const [tab, setTab] = useState("jinja2");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_flask-inter") ?? "jinja2"; } catch { return "jinja2"; }
+  });
   return (
     <div style={{ padding:"0 0 40px" }}>
       <PageHeader eyebrow="Flask • Intermediate" title="Flask Intermediate" sub="Jinja2 templates, forms, blueprints, sessions, flash messages, and SQLite integration." color={T.green}/>
@@ -426,7 +428,7 @@ export default function FlaskIntermediate() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Jinja2 template inheritance, Blueprints, and session handling are what turn a toy Flask app into something you could actually show a user. Every non-trivial Flask project uses all three. This is the step where apps start looking and feeling like real software.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="flask-inter"/>
         {tab === "jinja2"      && <TabJinja/>}
         {tab === "forms"       && <TabForms/>}
         {tab === "blueprints"  && <TabBlueprints/>}

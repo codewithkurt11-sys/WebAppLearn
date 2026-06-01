@@ -1370,7 +1370,9 @@ body {
 }
 
 export default function HTMLCSs() {
-  const [tab, setTab] = useState("whatishtml");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_html-css") ?? "whatishtml"; } catch { return "whatishtml"; }
+  });
   const content: Record<string, React.ReactNode> = {
     whatishtml:<TabWhatIsHTML/>, basics:<TabBasics/>, elements:<TabElements/>,
     forms:<TabForms/>, whatiscss:<TabWhatIsCSS/>, cssbasics:<TabCSSBasics/>,
@@ -1385,7 +1387,7 @@ export default function HTMLCSs() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Every web app you'll ever build lives inside an HTML page and gets its look from CSS. Flask renders HTML. Your JavaScript manipulates HTML. Even mobile apps often use HTML-based UIs. This is the foundation everything else sits on.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="html-css"/>
         {tab === "quiz"
           ? <Card><CardTitle color={T.amber}>🎯 HTML & CSS Quiz</CardTitle><Quiz questions={QUIZ} trackId="html-css"/></Card>
           : content[tab]

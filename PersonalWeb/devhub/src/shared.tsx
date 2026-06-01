@@ -1,7 +1,7 @@
 // ─── RE-EXPORTS (modular locations) ───────────────────────────────
 export { useWindowWidth }               from "./hooks/useWindowWidth";
-export { T, DARK_COLORS, LIGHT_COLORS } from "./utils/theme";
-export { NAV }                          from "./utils/nav";
+export { T, THEMES, THEME_ORDER, THEME_META } from "./utils/theme";
+export { NAV, ALL_ITEMS }              from "./utils/nav";
 export type { NavItem, NavGroup, AppCtxType } from "./types";
 export { AppCtx, useApp, RunCtx }       from "./contexts/AppContext";
 import { useProgressCtx }               from "./contexts/ProgressContext";
@@ -12,6 +12,11 @@ import { useState, useEffect, useContext } from "react";
 import { T } from "./utils/theme";
 import { RunCtx } from "./contexts/AppContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
+// explainLine kept available via components/CodeExplanation (Cheatsheets only)
+
+// Legacy aliases so original pages compile without changes
+export const DARK_COLORS  = {} as Record<string, string>;
+export const LIGHT_COLORS = {} as Record<string, string>;
 
 // ─── LOCAL TYPE DEFINITIONS ────────────────────────────────────────
 export interface Tab      { id: string; label: string; }
@@ -197,7 +202,6 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   const [output, setOutput]     = useState<string | null>(null);
   const [execTime, setExecTime] = useState<string | null>(null);
   const [running, setRunning]   = useState(false);
-  const [explainOpen, setExplainOpen] = useState(false);
   const [pyReady, setPyReady]   = useState(_pyodideReady);
 
   const lines = code.trim().split("\n");
@@ -263,7 +267,23 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   const dot = LANG_DOTS[lang] || T.muted2;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(code.trim()).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); });
+    navigator.clipboard.writeText(code.trim()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+      const toast = document.createElement("div");
+      toast.textContent = "Copied!";
+      toast.style.cssText = `
+        position: fixed; bottom: 24px; right: 24px;
+        background: ${T.green}; color: ${T.bg};
+        padding: 8px 16px; border-radius: 8px;
+        font-size: 12px; font-family: 'Fira Code', monospace;
+        font-weight: 600; z-index: 9999;
+        animation: fadeInUp 0.2s ease;
+        pointer-events: none;
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 1800);
+    });
   };
 
   const pyLoading   = lang === "py" && canRun && !pyReady && _pyodideLoading;
@@ -346,38 +366,7 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
         </div>
       )}
     </div>
-    {explanation && explanation.length > 0 && (
-      <div>
-        <button
-          onClick={() => setExplainOpen(o => !o)}
-          style={{
-            marginTop: 6, display: "flex", alignItems: "center", gap: 5,
-            background: "transparent", border: `1px solid ${T.border2}`,
-            borderRadius: 6, color: T.muted2, fontSize: 10.5,
-            fontFamily: "'Fira Code',monospace", padding: "4px 11px",
-            cursor: "pointer", transition: "all .15s",
-          }}
-          onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = T.accent; el.style.color = T.accent; }}
-          onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = T.border2; el.style.color = T.muted2; }}
-        >
-          {explainOpen ? "▼ Hide explanation" : "▶ Explain this code"}
-        </button>
-        <div style={{ maxHeight: explainOpen ? "3000px" : "0", overflow: "hidden", transition: "max-height .35s cubic-bezier(.4,0,.2,1)" }}>
-          <div style={{ background: T.surface2, borderRadius: 10, padding: "12px 16px", marginTop: 8 }}>
-            {code.trim().split("\n").map((line, i) => {
-              const allLines = code.trim().split("\n");
-              return (
-                <div key={i} style={{ display: "flex", gap: 12, padding: "6px 0", borderBottom: i < allLines.length - 1 ? `1px solid ${T.border}` : "none", alignItems: "flex-start" }}>
-                  <span style={{ color: T.muted, minWidth: 22, fontSize: 10, fontFamily: "'Fira Code',monospace", flexShrink: 0, paddingTop: 2 }}>{i + 1}</span>
-                  <code style={{ fontFamily: "'Fira Code',monospace", fontSize: 10.5, color: T.muted2, flex: "0 0 44%", whiteSpace: "pre", overflow: "hidden", textOverflow: "ellipsis" }}>{line || " "}</code>
-                  <span style={{ fontSize: 12, color: T.text, flex: 1, lineHeight: 1.65 }}>{(explanation ?? [])[i] ?? ""}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    )}
+    {/* explain-this-code UI moved to Cheatsheets only (CodeExplanation component) */}
     </div>
   );
 }
@@ -447,123 +436,190 @@ export function TryIt({ children }: { children: ReactNode }) {
         fontSize: 9.5, color: T.green, fontFamily: "'Fira Code',monospace",
         letterSpacing: "1.5px", fontWeight: 700, marginBottom: 7,
       }}>✏  TRY IT YOURSELF</div>
-      <div style={{ fontSize: 12.5, color: T.muted2, lineHeight: 1.7 }}>{children}</div>
+      {children}
     </div>
   );
 }
 
-// ─── TAB BAR ──────────────────────────────────────────────────────
-export function TabBar({ tabs, active, onChange }: { tabs: Tab[]; active: string; onChange: (id: string) => void }) {
+// ─── QUIZ ─────────────────────────────────────────────────────────
+export function Quiz({ questions, trackKey, trackId }: { questions: Question[]; trackKey?: string; trackId?: string }) {
+  trackKey = trackKey ?? trackId;
+  const [answers, setAnswers]   = useState<Record<number, number>>({});
+  const [submitted, setSubmit]  = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+  const { saveProgress } = useProgressCtx();
+
+  const score = submitted
+    ? questions.reduce((n, q, i) => n + (answers[i] === q.ans ? 1 : 0), 0)
+    : 0;
+
+  const handleSubmit = async () => {
+    setSubmit(true);
+    const pct = Math.round((score / questions.length) * 100);
+    if (trackKey) {
+      setSaving(true);
+      await saveProgress(trackKey, score === questions.length, pct);
+      setSaving(false);
+      setSaved(true);
+    }
+  };
+
+  const allAnswered = Object.keys(answers).length === questions.length;
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 16, color: T.accent }}>
+        📝 Quiz — {questions.length} questions
+      </div>
+      {questions.map((q, qi) => (
+        <div key={qi} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 11, padding: "14px 16px", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, lineHeight: 1.5 }}>
+            <span style={{ color: T.muted, fontFamily: "'Fira Code',monospace", fontSize: 10, marginRight: 8 }}>Q{qi + 1}</span>
+            {q.q}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {q.opts.map((opt, oi) => {
+              const selected = answers[qi] === oi;
+              const isCorrect = submitted && oi === q.ans;
+              const isWrong   = submitted && selected && oi !== q.ans;
+              return (
+                <button
+                  key={oi}
+                  disabled={submitted}
+                  onClick={() => setAnswers(prev => ({ ...prev, [qi]: oi }))}
+                  style={{
+                    textAlign: "left", padding: "9px 13px",
+                    border: `1px solid ${isCorrect ? T.green : isWrong ? T.rose : selected ? T.accent : T.border2}`,
+                    borderRadius: 8,
+                    background: isCorrect ? "rgba(52,211,153,.08)" : isWrong ? "rgba(251,113,133,.08)" : selected ? `${T.accent}12` : "transparent",
+                    color: isCorrect ? T.green : isWrong ? T.rose : selected ? T.accent : T.muted2,
+                    fontSize: 12.5, cursor: submitted ? "default" : "pointer",
+                    transition: "all .15s",
+                  }}
+                >{opt}</button>
+              );
+            })}
+          </div>
+          {submitted && (
+            <div style={{ marginTop: 10, fontSize: 11.5, color: T.muted2, background: T.bg2, borderRadius: 7, padding: "8px 12px" }}>
+              💡 {q.exp}
+            </div>
+          )}
+        </div>
+      ))}
+      {!submitted ? (
+        <button
+          onClick={handleSubmit}
+          disabled={!allAnswered}
+          style={{
+            padding: "10px 24px",
+            background: allAnswered ? `linear-gradient(135deg,${T.accent},${T.rose})` : T.border,
+            border: "none", borderRadius: 9, color: "#fff",
+            fontFamily: "'Bricolage Grotesque',sans-serif",
+            fontWeight: 700, fontSize: 13,
+            cursor: allAnswered ? "pointer" : "not-allowed",
+            opacity: allAnswered ? 1 : 0.6,
+            transition: "opacity .2s",
+          }}
+        >Submit answers</button>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{
+            padding: "10px 20px", borderRadius: 9,
+            background: score === questions.length ? "rgba(52,211,153,.1)" : "rgba(251,191,36,.1)",
+            border: `1px solid ${score === questions.length ? T.green : T.amber}`,
+            color: score === questions.length ? T.green : T.amber,
+            fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 14,
+          }}>
+            {score}/{questions.length} correct · {Math.round((score / questions.length) * 100)}%
+          </div>
+          {saving && <span style={{ fontSize: 11.5, color: T.muted, fontFamily: "'Fira Code',monospace" }}>saving…</span>}
+          {saved  && <span style={{ fontSize: 11.5, color: T.green, fontFamily: "'Fira Code',monospace" }}>✓ saved</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SECTION ──────────────────────────────────────────────────────
+export function Section({ title, children, color }: { title: string; children: ReactNode; color?: string }) {
   const isMobile = useWindowWidth() < 900;
   return (
-    <div style={{ display: "flex", gap: 3, flexWrap: "nowrap", overflowX: "auto", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: 4, marginBottom: 20, msOverflowStyle: "none", scrollbarWidth: "none" }}>
-      {tabs.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)} style={{
-          flexShrink: 0, padding: isMobile ? "7px 10px" : "8px 14px",
-          border: "none", borderRadius: 7,
-          background: active === t.id ? T.surface2 : "transparent",
-          color: active === t.id ? T.text : T.muted2,
-          fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600,
-          fontSize: isMobile ? 11 : 12, transition: "all .15s", whiteSpace: "nowrap", cursor: "pointer",
-        }}>
-          {t.label}
-        </button>
+    <div style={{ padding: isMobile ? "20px 14px" : "28px 24px", borderBottom: `1px solid ${T.border}` }}>
+      <h2 style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: isMobile ? 17 : 20, letterSpacing: "-0.5px", marginBottom: 14, color: color || T.text }}>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+// ─── TABS / TABBAR ────────────────────────────────────────────────
+export function TabBar({ tabs, active, onChange, pageId }: {
+  tabs: Tab[];
+  active: string;
+  onChange: (id: string) => void;
+  pageId?: string;
+}) {
+  const handleChange = (id: string) => {
+    onChange(id);
+    if (pageId) {
+      try { localStorage.setItem(`cif_tab_${pageId}`, id); } catch {}
+    }
+  };
+  return (
+    <div style={{ display: "flex", gap: 2, padding: "12px 14px 0", borderBottom: `1px solid ${T.border}`, overflowX: "auto" }}>
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => handleChange(tab.id)}
+          style={{
+            padding: "8px 14px", border: "none", background: "transparent",
+            color: active === tab.id ? T.accent : T.muted2,
+            borderBottom: active === tab.id ? `2px solid ${T.accent}` : "2px solid transparent",
+            fontFamily: "'Bricolage Grotesque',sans-serif",
+            fontWeight: active === tab.id ? 700 : 500,
+            fontSize: 12.5, cursor: "pointer", transition: "all .15s",
+            whiteSpace: "nowrap",
+          }}
+        >{tab.label}</button>
+      ))}
+    </div>
+  );
+}
+
+export function Tabs({ tabs, active, onChange }: { tabs: Tab[]; active: string; onChange: (id: string) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 2, padding: "12px 14px 0", borderBottom: `1px solid ${T.border}`, overflowX: "auto" }}>
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          style={{
+            padding: "8px 14px", border: "none", background: "transparent",
+            color: active === tab.id ? T.accent : T.muted2,
+            borderBottom: active === tab.id ? `2px solid ${T.accent}` : "2px solid transparent",
+            fontFamily: "'Bricolage Grotesque',sans-serif",
+            fontWeight: active === tab.id ? 700 : 500,
+            fontSize: 12.5, cursor: "pointer", transition: "all .15s",
+            whiteSpace: "nowrap",
+          }}
+        >{tab.label}</button>
       ))}
     </div>
   );
 }
 
 // ─── PAGE HEADER ──────────────────────────────────────────────────
-export function PageHeader({ eyebrow, title, sub, color }: { eyebrow: string; title: string; sub?: string; color?: string }) {
+export function PageHeader({ icon, title, subtitle, sub, color, tag, eyebrow }: { icon?: string; title: string; subtitle?: string; sub?: string; color?: string; tag?: string; eyebrow?: string }) {
+  subtitle = subtitle ?? sub;
+  tag = tag ?? eyebrow;
   const isMobile = useWindowWidth() < 900;
   return (
-    <div style={{ padding: isMobile ? "20px 16px 14px" : "36px 24px 20px" }}>
-      <div style={{ fontSize: 10, fontFamily: "'Fira Code',monospace", color: color || T.accent, letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>{eyebrow}</div>
-      <h2 style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, letterSpacing: "-1px", fontSize: isMobile ? "clamp(1.3rem,6vw,1.7rem)" : "clamp(1.5rem,4vw,2.2rem)", lineHeight: 1.1, marginBottom: 8 }}>{title}</h2>
-      {sub && <p style={{ fontSize: isMobile ? 12 : 13, color: T.muted2 }}>{sub}</p>}
-    </div>
-  );
-}
-
-// ─── QUIZ ─────────────────────────────────────────────────────────
-export function Quiz({ questions, trackId }: { questions: Question[]; trackId?: string }) {
-  const isMobile = useWindowWidth() < 900;
-  const [idx, setIdx]       = useState(0);
-  const [score, setScore]   = useState(0);
-  const [chosen, setChosen] = useState<number | null>(null);
-  const [done, setDone]     = useState(false);
-  const [saved, setSaved]   = useState(false);
-  const { saveProgress }    = useProgressCtx();
-  const q = questions[idx];
-  const answer = (i: number) => { if (chosen !== null) return; setChosen(i); if (i === q.ans) setScore(s => s + 1); };
-  const next   = () => { if (idx + 1 >= questions.length) { setDone(true); return; } setIdx(i => i + 1); setChosen(null); };
-  const reset  = () => { setIdx(0); setScore(0); setChosen(null); setDone(false); setSaved(false); };
-  if (done && !saved && trackId) {
-    setSaved(true);
-    const passed = score >= Math.ceil(questions.length / 2);
-    const pct = Math.round((score / questions.length) * 100);
-    saveProgress(trackId, passed, pct);
-  }
-
-  if (done) return (
-    <div style={{ textAlign: "center", padding: "28px 0" }}>
-      <div style={{ fontSize: 44, marginBottom: 12 }}>{score === questions.length ? "🏆" : score >= questions.length / 2 ? "👍" : "📚"}</div>
-      <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 6 }}>
-        {score}/{questions.length} correct
-      </div>
-      <div style={{ fontSize: 12.5, color: T.muted2, marginBottom: 20 }}>
-        {score === questions.length ? "Perfect score! 🎉" : score >= questions.length / 2 ? "Good work — review the misses." : "Keep practicing — you've got this."}
-      </div>
-      {trackId && <div style={{ fontSize: 11, color: T.green, fontFamily: "'Fira Code',monospace", marginBottom: 16, letterSpacing: "0.5px" }}>✓ progress saved</div>}
-      <button onClick={reset} style={{ padding: "8px 22px", background: "rgba(124,109,250,.12)", border: `1px solid rgba(124,109,250,.25)`, borderRadius: 8, color: T.accent, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-        Try again
-      </button>
-    </div>
-  );
-
-  return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 13, padding: isMobile ? "16px" : "20px 24px", margin: "12px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ fontSize: 10, fontFamily: "'Fira Code',monospace", color: T.muted, letterSpacing: "1px" }}>QUIZ · {idx + 1}/{questions.length}</span>
-        <span style={{ fontSize: 10, fontFamily: "'Fira Code',monospace", color: T.green }}>score: {score}</span>
-      </div>
-      <div style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, marginBottom: 16, lineHeight: 1.5 }}>{q.q}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {q.opts.map((opt, i) => {
-          const isChosen  = chosen === i;
-          const isCorrect = i === q.ans;
-          const show      = chosen !== null;
-          let bg: string = T.bg2, border: string = T.border, color: string = T.text;
-          if (show && isCorrect)        { bg = "rgba(52,211,153,.1)"; border = "rgba(52,211,153,.4)"; color = T.green; }
-          else if (show && isChosen)    { bg = "rgba(251,113,133,.1)"; border = "rgba(251,113,133,.4)"; color = T.rose; }
-          else if (isChosen)            { bg = T.surface2; border = T.accent; }
-          return (
-            <button key={i} onClick={() => answer(i)} disabled={chosen !== null} style={{
-              padding: "10px 14px", background: bg, border: `1px solid ${border}`, borderRadius: 8,
-              color, fontSize: 12.5, textAlign: "left", cursor: chosen !== null ? "default" : "pointer", transition: "all .15s", fontWeight: isChosen || (show && isCorrect) ? 600 : 400,
-            }}>
-              <span style={{ fontFamily: "'Fira Code',monospace", fontSize: 10, marginRight: 8, color: T.muted }}>
-                {["A","B","C","D"][i]}.
-              </span>
-              {opt}
-              {show && isCorrect && <span style={{ float: "right" }}>✓</span>}
-              {show && isChosen && !isCorrect && <span style={{ float: "right" }}>✗</span>}
-            </button>
-          );
-        })}
-      </div>
-      {chosen !== null && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, color: T.muted2, background: T.bg2, borderRadius: 8, padding: "10px 12px", lineHeight: 1.6, marginBottom: 12 }}>
-            💡 {q.exp}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={next} style={{ padding: "7px 20px", background: "rgba(124,109,250,.12)", border: `1px solid rgba(124,109,250,.25)`, borderRadius: 7, color: T.accent, fontSize: 12.5, cursor: "pointer", fontWeight: 600 }}>
-              {idx + 1 >= questions.length ? "See results →" : "Next →"}
-            </button>
-          </div>
-        </div>
-      )}
+    <div style={{ padding: isMobile ? "20px 14px 14px" : "36px 24px 20px" }}>
+      {icon && <div style={{ fontSize: isMobile ? 28 : 36, marginBottom: 10 }}>{icon}</div>}
+      {tag && <div style={{ fontSize: 9, color: color || T.accent, fontFamily: "'Fira Code',monospace", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 8 }}>{tag}</div>}
+      <h1 style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: isMobile ? "clamp(1.3rem,6vw,1.7rem)" : "clamp(1.5rem,4vw,2.2rem)", lineHeight: 1.1, marginBottom: subtitle ? 8 : 0, letterSpacing: "-1px", color: color || T.text }}>{title}</h1>
+      {subtitle && <p style={{ fontSize: 13, color: T.muted2, lineHeight: 1.6 }}>{subtitle}</p>}
     </div>
   );
 }

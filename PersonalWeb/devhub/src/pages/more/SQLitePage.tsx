@@ -149,7 +149,9 @@ function TabFlask() {
 }
 
 export default function SQLitePage() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_sqlite") ?? "intro"; } catch { return "intro"; }
+  });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, create:<TabCreate/>, select:<TabSelect/>,
     update:<TabUpdate/>, python:<TabPython/>, flask:<TabFlask/>,
@@ -161,7 +163,7 @@ export default function SQLitePage() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Every real app needs to store data somewhere. Once you add a database to your projects, you stop losing data on restart, you can search and filter thousands of records instantly, and you can build things users actually rely on. SQL is also a skill that never goes out of date.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="sqlite"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.sky}>🎯 SQLite Quiz</CardTitle><Quiz questions={QUIZ} trackId="sqlite"/></Card>
           : content[tab]

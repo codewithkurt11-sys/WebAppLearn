@@ -583,7 +583,9 @@ zipalign -v 4 \
 }
 
 export default function Kivy() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_kivy") ?? "intro"; } catch { return "intro"; }
+  });
   return (
     <div>
       <PageHeader
@@ -596,7 +598,7 @@ export default function Kivy() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Kivy lets you write one Python codebase and deploy it as an Android app, an iOS app, a Windows app, and a Linux app — simultaneously. For Python developers who want to reach mobile users without learning Swift or Kotlin, Kivy is a genuine path. The same skills also transfer to game development and interactive data tools.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="kivy"/>
         {tab === "intro"   && <TabIntro/>}
         {tab === "kv"      && <TabKV/>}
         {tab === "layouts" && <TabLayouts/>}

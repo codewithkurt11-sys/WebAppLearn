@@ -377,7 +377,9 @@ python-dotenv==1.0.1`}/>
 }
 
 export default function FlaskExpert() {
-  const [tab, setTab] = useState("sqlalchemy");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_flask-expert") ?? "sqlalchemy"; } catch { return "sqlalchemy"; }
+  });
   return (
     <div style={{ padding:"0 0 40px" }}>
       <PageHeader eyebrow="Flask • Expert" title="Flask Expert" sub="SQLAlchemy ORM, user auth, REST APIs, file uploads, security best practices, and production deployment." color={T.green}/>
@@ -385,7 +387,7 @@ export default function FlaskExpert() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           This is what production Flask looks like. SQLAlchemy ORM, bcrypt passwords, JWT-style auth, REST APIs, and deployment to a real server are the exact skills listed in backend web developer job postings. A portfolio project using all of these is genuinely impressive.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="flask-expert"/>
         {tab === "sqlalchemy" && <TabSQLAlchemy/>}
         {tab === "auth"       && <TabAuth/>}
         {tab === "rest"       && <TabRest/>}

@@ -133,7 +133,9 @@ function TabApps() {
 }
 
 export default function Tkinter() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_tkinter") ?? "intro"; } catch { return "intro"; }
+  });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, widgets:<TabWidgets/>, layout:<TabLayout/>,
     events:<TabEvents/>, vars:<TabVars/>, apps:<TabApps/>,
@@ -145,7 +147,7 @@ export default function Tkinter() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Most Python tutorials only teach you to write scripts that run in a terminal. Tkinter lets you wrap those scripts in a real windowed app with buttons, input fields, and menus — without learning a new language. It's also built into Python, so there's nothing to install.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="tkinter"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.sky}>🎯 Tkinter Quiz</CardTitle><Quiz questions={QUIZ} trackId="tkinter"/></Card>
           : content[tab]

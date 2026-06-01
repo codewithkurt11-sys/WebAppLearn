@@ -438,7 +438,9 @@ r.describe()`}/>
 }
 
 export default function PyAdvanced() {
-  const [tab, setTab] = useState("decorators");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_py-adv") ?? "decorators"; } catch { return "decorators"; }
+  });
   return (
     <div style={{ padding:"0 0 40px" }}>
       <PageHeader eyebrow="Python • Advanced" title="Python Advanced" sub="Decorators, generators, async/await, type hints, context managers, and metaclasses." color={T.accent}/>
@@ -446,7 +448,7 @@ export default function PyAdvanced() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Decorators, generators, and async/await are what separate someone who knows Python from someone who writes Python professionally. These patterns show up in every web framework, every data pipeline, and every API client. Type hints aren't optional in production code anymore — they're how teams catch bugs before they ship.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="py-adv"/>
         {tab === "decorators" && <TabDecorators/>}
         {tab === "generators" && <TabGenerators/>}
         {tab === "async"      && <TabAsync/>}

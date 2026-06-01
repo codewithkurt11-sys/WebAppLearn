@@ -526,7 +526,7 @@ doubled = list(map(lambda n: n * 2, numbers))
 # filter() — keep items where function returns True
 evens = list(filter(lambda n: n % 2 == 0, numbers))
 # [2, 4]`}/>
-      <InfoBox type="info">Flask route handlers are functions. <IC>return f"Hello, {name}!"</IC> in a route is exactly the same as returning from any function — the return value becomes the HTTP response.</InfoBox>
+      <InfoBox type="info">Flask route handlers are functions. <IC>{"return f\"Hello, {name}!\""}</IC> in a route is exactly the same as returning from any function — the return value becomes the HTTP response.</InfoBox>
     </Card>
     <TryIt>
       Write a function called <IC>bmi(weight_kg, height_m)</IC> that calculates BMI (<IC>weight / height²</IC>) and returns the category:<br/>
@@ -758,7 +758,9 @@ parsed   = json.loads(json_str)     # JSON string → dict
 }
 
 export default function PyBasics() {
-  const [tab, setTab] = useState("vars");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_py-basics") ?? "vars"; } catch { return "vars"; }
+  });
   const content: Record<string, React.ReactNode> = {
     vars:<PybVars/>, strings:<PybStrings/>, lists:<PybLists/>, dicts:<PybDicts/>,
     ifs:<PybIfs/>, loops:<PybLoops/>, funcs:<PybFuncs/>, classes:<PybClasses/>,
@@ -771,7 +773,7 @@ export default function PyBasics() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Python shows up in job listings more than almost any other language — data science, AI, backend web, automation, scripting. The concepts here aren't beginner stuff you'll throw away: variables, loops, functions, and classes are the exact same patterns you'll write in real jobs. Each tab follows the same pattern: definition → explanation → example → practice.
         </p>
-        <TabBar tabs={PYB_TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={PYB_TABS} active={tab} onChange={setTab} pageId="py-basics"/>
         {tab === "quiz"
           ? <Card><CardTitle color={T.accent}>🎯 Python Basics Quiz</CardTitle><Quiz questions={PYB_QUIZ} trackId="py-basics"/></Card>
           : content[tab]

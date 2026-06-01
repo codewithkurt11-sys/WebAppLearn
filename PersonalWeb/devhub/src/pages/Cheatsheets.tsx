@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, PageHeader, useWindowWidth } from "../shared";
+import { CodeExplanation } from "../components/CodeExplanation";
 
 type Lang = "all" | "python" | "javascript" | "flask" | "html";
 
@@ -300,6 +301,7 @@ function SheetCard({ sheet }: { sheet: Sheet }) {
             <div key={i} style={{ background:T.bg2, border:`1px solid ${T.border2}`, borderRadius:10, padding:"12px 14px" }}>
               <div style={{ fontSize:10, fontFamily:"'Fira Code',monospace", color:sheet.color, letterSpacing:"1px", textTransform:"uppercase", marginBottom:8 }}>{item.label}</div>
               <CodeBlock code={item.code} lang={item.langCode || "py"}/>
+              <CodeExplanation code={item.code} lang={item.langCode || "py"} />
               {item.note && <div style={{ fontSize:11, color:T.muted2, marginTop:6, lineHeight:1.5 }}>{item.note}</div>}
             </div>
           ))}

@@ -1,20 +1,38 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
-import { T, DARK_COLORS, LIGHT_COLORS, AppCtx, RunCtx, useApp, useWindowWidth } from "./shared";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ProgressProvider } from "./contexts/ProgressContext";
-import { Sidebar } from "./layouts/Sidebar";
-import { TopBar }  from "./layouts/TopBar";
-import { ErrorBoundary } from "./components/ErrorBoundary";
-import PageSkeleton from "./components/PageSkeleton";
-import AuthModal from "./components/AuthModal";
+import { Suspense, lazy, useState, useEffect, useCallback } from "react";
+import { AuthProvider }       from "./contexts/AuthContext";
+import { ProgressProvider }   from "./contexts/ProgressContext";
+import { AppCtx, RunCtx }     from "./contexts/AppContext";
+import { useAuth }            from "./contexts/AuthContext";
+import { Sidebar }            from "./layouts/Sidebar";
+import { TopBar }             from "./layouts/TopBar";
+import AuthModal              from "./components/AuthModal";
+import GlobalSearch           from "./components/GlobalSearch";
+import PageSkeleton           from "./components/PageSkeleton";
+import { ErrorBoundary }      from "./components/ErrorBoundary";
+import type { ThemeKey }      from "./utils/theme";
+import { loadTheme, applyTheme } from "./utils/theme";
+import { T }                  from "./utils/theme";
+import { useWindowWidth }     from "./hooks/useWindowWidth";
+import { useReduceMotion, initReduceMotion } from "./hooks/useReduceMotion";
 
-// ─── LAZY PAGE IMPORTS (route-based code splitting) ────────────────
+// Apply persisted preferences immediately — before React renders anything
+(function initPrefs() {
+  try {
+    initReduceMotion();
+    const size = localStorage.getItem("cif_font_size") ?? "M";
+    const scale = size === "S" ? "0.92" : size === "L" ? "1.08" : "1";
+    document.documentElement.style.setProperty("--cif-font-scale", scale);
+  } catch {}
+}());
+
+// Lazy pages
 const Dashboard      = lazy(() => import("./pages/Dashboard"));
 const Roadmap        = lazy(() => import("./pages/Roadmap"));
+const Settings       = lazy(() => import("./pages/Settings"));
 const Cheatsheets    = lazy(() => import("./pages/Cheatsheets"));
 const ComponentDemo  = lazy(() => import("./pages/ComponentDemo"));
 const Feedback       = lazy(() => import("./pages/Feedback"));
-const Settings       = lazy(() => import("./pages/Settings"));
+const Profile        = lazy(() => import("./pages/Profile"));
 const PyBasics       = lazy(() => import("./pages/python/PyBasics"));
 const PyIntermediate = lazy(() => import("./pages/python/PyIntermediate"));
 const PyAdvanced     = lazy(() => import("./pages/python/PyAdvanced"));
@@ -28,145 +46,207 @@ const Kivy           = lazy(() => import("./pages/more/Kivy"));
 const WebScraping    = lazy(() => import("./pages/more/WebScraping"));
 const SQLitePage     = lazy(() => import("./pages/more/SQLitePage"));
 const HTMLCSs        = lazy(() => import("./pages/web/HTMLCSs"));
+const JSAdvanced     = lazy(() => import("./pages/javascript/JSAdvanced"));
+const CppBasics      = lazy(() => import("./pages/other/CppBasics"));
+const CppIntermediate= lazy(() => import("./pages/other/CppIntermediate"));
+const CppAdvanced    = lazy(() => import("./pages/other/CppAdvanced"));
+const CsharpBasics   = lazy(() => import("./pages/other/CsharpBasics"));
+const CsharpIntermediate = lazy(() => import("./pages/other/CsharpIntermediate"));
+const CsharpAdvanced = lazy(() => import("./pages/other/CsharpAdvanced"));
+const Home           = lazy(() => import("./pages/Home"));
 
-// ─── HELPERS ──────────────────────────────────────────────────────
-const NO_RUN = (node: ReactNode) => (
-  <RunCtx.Provider value={false}>{node}</RunCtx.Provider>
-);
+const SIDEBAR_W = 220;
 
-function ComingSoon({ title, desc, color }: { title: string; desc: string; color?: string }) {
+// Only lesson/content pages go into Continue Learning — never utility pages.
+const LESSON_PAGES = new Set([
+  "py-basics", "py-inter", "py-adv",
+  "flask-basics", "flask-inter", "flask-expert",
+  "js-basics", "js-inter", "js-adv",
+  "tkinter", "kivy", "scraping", "sqlite", "html-css",
+  "cpp-basics", "cpp-inter", "cpp-adv",
+  "cs-basics", "cs-inter", "cs-adv",
+]);
+
+function trackRecentPage(id: string) {
+  if (!LESSON_PAGES.has(id)) return; // skip utility pages
+  try {
+    const raw = localStorage.getItem("cif_recent_pages");
+    const prev: string[] = raw ? JSON.parse(raw) : [];
+    const next = [id, ...prev.filter(x => x !== id)].slice(0, 10);
+    localStorage.setItem("cif_recent_pages", JSON.stringify(next));
+  } catch {}
+}
+
+function PageRenderer({ page, theme, setTheme, onShowAuth, setPage }: {
+  page: string;
+  theme: ThemeKey;
+  setTheme: (k: ThemeKey) => void;
+  onShowAuth: () => void;
+  setPage: (id: string) => void;
+}) {
+  const canRun = true;
+
   return (
-    <div style={{ padding: "60px 24px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>🚧</div>
-      <h2 style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 22, letterSpacing: "-1px", marginBottom: 10, color: color || T.accent }}>{title}</h2>
-      <p style={{ fontSize: 13, color: T.muted2, lineHeight: 1.7 }}>{desc}</p>
-      <div style={{ marginTop: 20, fontSize: 11, fontFamily: "'Fira Code',monospace", color: T.muted }}>// coming next →</div>
-    </div>
+    <RunCtx.Provider value={canRun}>
+      <ErrorBoundary>
+        <Suspense fallback={<PageSkeleton />}>
+          <div className="wl-page">
+            {page === "home"       && <Home onShowAuth={onShowAuth} setPage={setPage} />}
+            {page === "dashboard"  && <Dashboard />}
+            {page === "roadmap"    && <Roadmap />}
+            {page === "cheatsheet" && <Cheatsheets />}
+            {page === "components" && <ComponentDemo />}
+            {page === "feedback"   && <Feedback />}
+            {page === "settings"   && <Settings theme={theme} setTheme={setTheme} onShowAuth={onShowAuth} />}
+            {page === "profile"    && <Profile />}
+            {page === "py-basics"  && <PyBasics />}
+            {page === "py-inter"   && <PyIntermediate />}
+            {page === "py-adv"     && <PyAdvanced />}
+            {page === "flask-basics"   && <FlaskBasics />}
+            {page === "flask-inter"    && <FlaskIntermediate />}
+            {page === "flask-expert"   && <FlaskExpert />}
+            {page === "js-basics"  && <JSBasics />}
+            {page === "js-inter"   && <JSIntermediate />}
+            {page === "js-adv"     && <JSAdvanced />}
+            {page === "tkinter"    && <Tkinter />}
+            {page === "kivy"       && <Kivy />}
+            {page === "scraping"   && <WebScraping />}
+            {page === "sqlite"     && <SQLitePage />}
+            {page === "html-css"   && <HTMLCSs />}
+            {page === "cpp-basics" && <CppBasics />}
+            {page === "cpp-inter"  && <CppIntermediate />}
+            {page === "cpp-adv"    && <CppAdvanced />}
+            {page === "cs-basics"  && <CsharpBasics />}
+            {page === "cs-inter"   && <CsharpIntermediate />}
+            {page === "cs-adv"     && <CsharpAdvanced />}
+          </div>
+        </Suspense>
+      </ErrorBoundary>
+    </RunCtx.Provider>
   );
 }
 
-// ─── PAGE ROUTER ──────────────────────────────────────────────────
-function PageRouter() {
-  const { page } = useApp();
-
-  const content = (() => {
-    switch (page) {
-      case "dashboard":    return <Dashboard/>;
-      case "roadmap":      return <Roadmap/>;
-      case "cheatsheet":   return NO_RUN(<Cheatsheets/>);
-      case "components":   return <ComponentDemo/>;
-      case "feedback":     return <Feedback/>;
-      case "settings":     return <Settings/>;
-      case "py-basics":    return <PyBasics/>;
-      case "py-inter":     return <PyIntermediate/>;
-      case "py-adv":       return <PyAdvanced/>;
-      case "flask-basics": return NO_RUN(<FlaskBasics/>);
-      case "flask-inter":  return NO_RUN(<FlaskIntermediate/>);
-      case "flask-expert": return NO_RUN(<FlaskExpert/>);
-      case "js-basics":    return <JSBasics/>;
-      case "js-inter":     return <JSIntermediate/>;
-      case "tkinter":      return NO_RUN(<Tkinter/>);
-      case "kivy":         return NO_RUN(<Kivy/>);
-      case "scraping":     return NO_RUN(<WebScraping/>);
-      case "sqlite":       return NO_RUN(<SQLitePage/>);
-      case "html-css":     return NO_RUN(<HTMLCSs/>);
-      default:             return <Dashboard/>;
-    }
-  })();
-
-  return (
-    <ErrorBoundary>
-      <Suspense fallback={<PageSkeleton/>}>
-        <div key={page} className="wl-page">
-          {content}
-        </div>
-      </Suspense>
-    </ErrorBoundary>
-  );
-}
-
-// ─── INNER APP ────────────────────────────────────────────────────
 function InnerApp() {
-  const [page, setPage]               = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showAuth, setShowAuth]       = useState(false);
-  const [isDark, setIsDark]           = useState(() => {
-    try { return localStorage.getItem("theme") !== "light"; } catch { return true; }
-  });
+  const { user, signOut } = useAuth();
   const isMobile = useWindowWidth() < 900;
+  useReduceMotion(); // initialise reduce-motion CSS class from localStorage
 
-  const colors  = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const cssVars = Object.entries(colors).map(([k, v]) => `--t-${k}: ${v};`).join("\n  ");
+  const [page,        setPageRaw]     = useState(() => (user ? "dashboard" : "home"));
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAuth,    setShowAuth]    = useState(false);
+  const [showSearch,  setShowSearch]  = useState(false);
+  const [theme,       setTheme]       = useState<ThemeKey>(loadTheme);
 
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    try { localStorage.setItem("theme", next ? "dark" : "light"); } catch {}
-  };
+  useEffect(() => { applyTheme(theme); }, [theme]);
+
+  // Track time spent (increment every 60s)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const prev = parseInt(localStorage.getItem("cif_time_spent") ?? "0", 10);
+        localStorage.setItem("cif_time_spent", String((isNaN(prev) ? 0 : prev) + 60));
+      } catch {}
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSearch(false);
+        setShowAuth(false);
+        setSidebarOpen(false);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const setPage = useCallback((id: string) => {
+    // Logged-in users should never see Home — redirect to Dashboard.
+    const target = (id === "home" && user) ? "dashboard" : id;
+    setPageRaw(target);
+    trackRecentPage(target);
+    try {
+      document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {}
+  }, [user]);
+
+  // Auto-redirect on login/logout
+  useEffect(() => {
+    if (user && page === "home") setPageRaw("dashboard");
+    if (!user && page !== "home") setPageRaw("home");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const appCtx = { page, setPage };
 
   return (
-    <AppCtx.Provider value={{ page, setPage }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700;12..96,800&family=Fira+Code:wght@400;500&display=swap');
-        :root { ${cssVars} }
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { font-size: 14.5px; }
-        body { background: var(--t-bg); color: var(--t-text); font-family: 'Bricolage Grotesque', sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .2s, color .2s; }
-        ::-webkit-scrollbar { width: 3px; height: 3px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--t-border2); border-radius: 2px; }
-        * { scrollbar-width: thin; scrollbar-color: var(--t-border2) transparent; }
-        code, pre { font-family: 'Fira Code', monospace; font-size: 13px; }
-        button { cursor: pointer; font-family: inherit; }
-        input, select, textarea { font-family: inherit; }
-        @keyframes pgFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .wl-page { animation: pgFade .22s ease both; }
-        .wl-card { transition: transform .18s ease, box-shadow .18s ease; }
-        .wl-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,.10); }
-      `}</style>
+    <AppCtx.Provider value={appCtx}>
+      <div style={{ display: "flex", minHeight: "100vh", background: T.bg }}>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)}/>}
-
-      <div style={{ display: "flex" }}>
         <Sidebar
+          page={page}
+          setPage={setPage}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isMobile={isMobile}
+          theme={theme}
+          setTheme={setTheme}
           onShowAuth={() => setShowAuth(true)}
-          isDark={isDark}
-          onToggleTheme={toggleTheme}
+          onOpenSearch={() => setShowSearch(true)}
+          user={user ? { email: user.email ?? "" } : null}
+          onSignOut={signOut}
         />
-        <main style={{
-          marginLeft: isMobile ? 0 : 218,
-          minHeight: "100vh", flex: 1, minWidth: 0,
-          transition: "margin-left .28s cubic-bezier(.4,0,.2,1)",
-          display: "flex", flexDirection: "column",
+
+        {/* Main content */}
+        <div style={{
+          flex: 1,
+          marginLeft: isMobile ? 0 : SIDEBAR_W,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100vh",
         }}>
-          {isMobile && (
-            <TopBar
-              onMenu={() => setSidebarOpen(true)}
+          <TopBar
+            page={page}
+            onMenu={() => setSidebarOpen(o => !o)}
+            menuOpen={sidebarOpen}
+            onSearch={() => setShowSearch(true)}
+            theme={theme}
+          />
+          <main style={{ flex: 1, overflowY: "auto", background: T.bg }}>
+            <PageRenderer
+              page={page}
+              theme={theme}
+              setTheme={setTheme}
               onShowAuth={() => setShowAuth(true)}
-              isDark={isDark}
-              onToggleTheme={toggleTheme}
+              setPage={setPage}
             />
-          )}
-          <div style={{ maxWidth: 880, margin: "0 auto", width: "100%", flex: 1 }}>
-            <PageRouter/>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      <GlobalSearch
+        open={showSearch}
+        onClose={() => setShowSearch(false)}
+        onNavigate={setPage}
+      />
     </AppCtx.Provider>
   );
 }
 
-// ─── APP ROOT ─────────────────────────────────────────────────────
 export default function App() {
   return (
     <AuthProvider>
       <ProgressProvider>
-        <ErrorBoundary>
-          <InnerApp/>
-        </ErrorBoundary>
+        <InnerApp />
       </ProgressProvider>
     </AuthProvider>
   );

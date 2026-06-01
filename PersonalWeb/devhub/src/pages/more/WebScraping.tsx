@@ -190,7 +190,9 @@ function TabEthics() {
 }
 
 export default function WebScraping() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_scraping") ?? "intro"; } catch { return "intro"; }
+  });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, requests:<TabRequests/>, bs4:<TabBS4/>,
     select:<TabSelect/>, forms:<TabForms/>, save:<TabSave/>, ethics:<TabEthics/>,
@@ -202,7 +204,7 @@ export default function WebScraping() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Web scraping turns the entire internet into your personal dataset. Job boards, sports stats, product prices, news headlines, government data — all of it is accessible with 20 lines of Python. Data scientists, researchers, and freelancers use scrapers constantly.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="scraping"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.muted2}>🎯 Web Scraping Quiz</CardTitle><Quiz questions={QUIZ} trackId="scraping"/></Card>
           : content[tab]

@@ -224,7 +224,9 @@ function TabAsync() {
 }
 
 export default function JSBasics() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_js-basics") ?? "intro"; } catch { return "intro"; }
+  });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, vars:<TabVars/>, funcs:<TabFuncs/>,
     dom:<TabDOM/>, events:<TabEvents/>, arrays:<TabArrays/>,
@@ -237,7 +239,7 @@ export default function JSBasics() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           JavaScript is the only language that runs natively in every browser on the planet. If you want anything on a webpage to move, respond to clicks, load data, or update without reloading — that's JavaScript. Every frontend framework (React, Vue, Angular) is JavaScript under the hood.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="js-basics"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.amber}>🎯 JavaScript Basics Quiz</CardTitle><Quiz questions={QUIZ} trackId="js-basics"/></Card>
           : content[tab]

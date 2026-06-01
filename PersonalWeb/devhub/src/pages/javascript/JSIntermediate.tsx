@@ -410,7 +410,9 @@ console.log(expensive);  // { apple: 1.2, cherry: 3.0 }`}/>
 }
 
 export default function JSIntermediate() {
-  const [tab, setTab] = useState("promises");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_js-inter") ?? "promises"; } catch { return "promises"; }
+  });
   return (
     <div style={{ padding:"0 0 40px" }}>
       <PageHeader eyebrow="JavaScript • Intermediate" title="JavaScript Intermediate" sub="Promises, async/await, destructuring, localStorage, regex, and advanced array patterns." color={T.amber}/>
@@ -418,7 +420,7 @@ export default function JSIntermediate() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Async/await and destructuring are in literally every modern JavaScript codebase. If you work on any web app after 2018, you'll encounter Promises within the first hour. These aren't advanced topics — they're the standard everyday tools of frontend and Node.js development.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="js-inter"/>
         {tab === "promises"      && <TabPromises/>}
         {tab === "asyncawait"    && <TabAsyncAwait/>}
         {tab === "destructuring" && <TabDestructuring/>}

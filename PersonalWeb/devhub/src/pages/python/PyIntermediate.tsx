@@ -160,7 +160,9 @@ function TabItertools() {
 }
 
 export default function PyIntermediate() {
-  const [tab, setTab] = useState("comprehensions");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_py-inter") ?? "comprehensions"; } catch { return "comprehensions"; }
+  });
   const content: Record<string, React.ReactNode> = {
     comprehensions:<TabComprehensions/>, generators:<TabGenerators/>,
     decorators:<TabDecorators/>, fileio:<TabFileIO/>,
@@ -173,7 +175,7 @@ export default function PyIntermediate() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           List comprehensions and proper OOP show up in every serious Python codebase. If you can read a Python file at a real job and understand a decorator, a class with inheritance, and a generator expression on sight — you're in the top tier of Python learners.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="py-inter"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.accent}>🎯 Python Intermediate Quiz</CardTitle><Quiz questions={QUIZ} trackId="py-inter"/></Card>
           : content[tab]

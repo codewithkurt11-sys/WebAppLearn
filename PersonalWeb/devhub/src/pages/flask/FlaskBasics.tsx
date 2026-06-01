@@ -278,7 +278,9 @@ function TabTemplates() {
 }
 
 export default function FlaskBasics() {
-  const [tab, setTab] = useState("intro");
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem("cif_tab_flask-basics") ?? "intro"; } catch { return "intro"; }
+  });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, testf:<TabTestf/>, routes:<TabRoutes/>,
     requests:<TabRequests/>, responses:<TabResponses/>, templates:<TabTemplates/>,
@@ -291,7 +293,7 @@ export default function FlaskBasics() {
         <p style={{ fontSize:13, color:T.muted2, lineHeight:1.7, marginBottom:20 }}>
           Flask feels confusing for about an hour — then the first working route clicks and it feels obvious. Once you understand routes, requests, and responses, you can build any API or web app backend. Flask powers everything from hobby projects to production systems handling millions of requests.
         </p>
-        <TabBar tabs={TABS} active={tab} onChange={setTab}/>
+        <TabBar tabs={TABS} active={tab} onChange={setTab} pageId="flask-basics"/>
         {tab==="quiz"
           ? <Card><CardTitle color={T.green}>🎯 Flask Basics Quiz</CardTitle><Quiz questions={QUIZ} trackId="flask-basics"/></Card>
           : content[tab]

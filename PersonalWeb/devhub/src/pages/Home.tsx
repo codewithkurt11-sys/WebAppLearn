@@ -1,5 +1,5 @@
 import { T } from "../utils/theme";
-import { Code2, Sparkles, BarChart3, Languages, PlayCircle, ArrowRight } from "lucide-react";
+import { Code2, Sparkles, BarChart3, Languages, PlayCircle, ArrowRight, Map, BookOpen } from "lucide-react";
 
 interface HomeProps {
   onShowAuth: () => void;
@@ -7,25 +7,29 @@ interface HomeProps {
 }
 
 const FEATURES = [
-  { icon: PlayCircle, title: "Interactive Lessons", body: "Read, run and tweak every example right in the page — no setup, no install." },
-  { icon: Code2,      title: "Built-in Code Runner", body: "Run Python and JavaScript in the browser. See output instantly." },
-  { icon: BarChart3,  title: "Track Progress",      body: "Your completed lessons sync automatically when you sign in." },
-  { icon: Languages,  title: "Multiple Languages",  body: "Python, JavaScript, C++, C#, Flask, HTML/CSS, SQL — one place." },
+  { icon: PlayCircle, title: "Interactive Lessons", body: "Read and run every code example right in the page — no setup, no install, no waiting." },
+  { icon: Code2,      title: "Built-in Code Runner", body: "Run Python and JavaScript in the browser. See output instantly with a real execution environment." },
+  { icon: BarChart3,  title: "Track Progress",      body: "Your completed lessons and quiz scores sync automatically when you sign in." },
+  { icon: Languages,  title: "8 Languages & Tracks", body: "Python, JavaScript, C++, C#, Flask, HTML/CSS, SQLite, Web Scraping — all in one place." },
+  { icon: Map,        title: "Learning Roadmap",    body: "A visual step-by-step roadmap shows you exactly where you are and what to learn next." },
+  { icon: BookOpen,   title: "Cheatsheets",         body: "Quick-reference cheatsheets for every language — searchable and always at hand." },
 ];
 
 const COURSES = [
-  { id: "py-basics", name: "Python Basics",     color: T.accent, tag: "beginner" },
-  { id: "js-basics", name: "JavaScript Basics", color: T.amber,  tag: "beginner" },
-  { id: "cpp-basics", name: "C++ Basics",       color: T.sky,    tag: "beginner" },
-  { id: "cs-basics",  name: "C# Basics",        color: T.rose,   tag: "beginner" },
-  { id: "html-css",   name: "HTML & CSS",       color: T.amber,  tag: "beginner" },
-  { id: "flask-basics", name: "Flask",          color: T.green,  tag: "intermediate" },
+  { id: "py-basics",    name: "Python",          sub: "Basics · Inter · Advanced", color: T.accent, tag: "3 levels" },
+  { id: "js-basics",    name: "JavaScript",      sub: "Basics · Inter · Advanced", color: T.amber,  tag: "3 levels" },
+  { id: "cpp-basics",   name: "C++",             sub: "Basics · Inter · Advanced", color: T.sky,    tag: "3 levels" },
+  { id: "cs-basics",    name: "C#",              sub: "Basics · Inter · Advanced", color: T.rose,   tag: "3 levels" },
+  { id: "html-css",     name: "HTML & CSS",      sub: "Markup, layouts, modern CSS", color: T.amber, tag: "beginner" },
+  { id: "flask-basics", name: "Flask",           sub: "Basics · Inter · Expert",   color: T.green,  tag: "3 levels" },
+  { id: "sqlite",       name: "SQLite",          sub: "SQL, queries, the sqlite3 module", color: T.sky, tag: "reference" },
+  { id: "scraping",     name: "Web Scraping",    sub: "requests, BeautifulSoup, CSV", color: T.muted2, tag: "reference" },
 ];
 
 const STEPS = [
-  { n: 1, title: "Sign up",        body: "Free account in 10 seconds — email or magic link." },
-  { n: 2, title: "Pick a course",  body: "Start anywhere — Python basics, JS, C++, whatever clicks." },
-  { n: 3, title: "Start learning", body: "Read, run, build. Progress saves as you go." },
+  { n: 1, title: "Sign up",        body: "Free account in seconds — email or magic link. No credit card, ever." },
+  { n: 2, title: "Pick a course",  body: "Start anywhere — Python, JavaScript, C++, Flask, whatever makes sense for you." },
+  { n: 3, title: "Start learning", body: "Read, run, build. Every example is interactive. Progress saves as you go." },
 ];
 
 export default function Home({ onShowAuth, setPage }: HomeProps) {
@@ -63,10 +67,18 @@ export default function Home({ onShowAuth, setPage }: HomeProps) {
 
         <p style={{
           fontSize: 19, color: T.muted2,
-          maxWidth: 560, margin: "20px auto 36px",
+          maxWidth: 560, margin: "20px auto 10px",
           lineHeight: 1.55,
         }}>
           Learn to code. Actually understand it.
+        </p>
+        <p style={{
+          fontSize: 14, color: T.muted,
+          maxWidth: 520, margin: "0 auto 36px",
+          lineHeight: 1.6,
+          fontFamily: "'Fira Code',monospace",
+        }}>
+          // Python · JavaScript · C++ · C# · Flask · HTML/CSS · SQLite · Web Scraping
         </p>
 
         <div style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
@@ -81,7 +93,7 @@ export default function Home({ onShowAuth, setPage }: HomeProps) {
               display: "inline-flex", alignItems: "center", gap: 8,
               boxShadow: `0 8px 24px ${T.accent}55`,
             }}
-          >Get Started <ArrowRight size={16} /></button>
+          >Get Started Free <ArrowRight size={16} /></button>
           <button
             onClick={() => scrollTo("features")}
             style={{
@@ -99,11 +111,14 @@ export default function Home({ onShowAuth, setPage }: HomeProps) {
       <section id="features" style={{ padding: "40px 24px", maxWidth: 1100, margin: "0 auto" }}>
         <h2 style={{
           fontFamily: "'Bricolage Grotesque',sans-serif",
-          fontSize: 28, fontWeight: 700, marginBottom: 24, color: T.text,
+          fontSize: 28, fontWeight: 700, marginBottom: 8, color: T.text,
         }}>Why codeisfun</h2>
+        <p style={{ fontSize: 13, color: T.muted2, marginBottom: 24, fontFamily: "'Fira Code',monospace" }}>
+          // everything you need to go from zero to confident
+        </p>
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))",
           gap: 16,
         }}>
           {FEATURES.map(f => (
@@ -128,8 +143,11 @@ export default function Home({ onShowAuth, setPage }: HomeProps) {
       <section style={{ padding: "40px 24px", maxWidth: 1100, margin: "0 auto" }}>
         <h2 style={{
           fontFamily: "'Bricolage Grotesque',sans-serif",
-          fontSize: 28, fontWeight: 700, marginBottom: 24, color: T.text,
-        }}>Courses</h2>
+          fontSize: 28, fontWeight: 700, marginBottom: 8, color: T.text,
+        }}>Courses & Tracks</h2>
+        <p style={{ fontSize: 13, color: T.muted2, marginBottom: 24, fontFamily: "'Fira Code',monospace" }}>
+          // 8 languages and topics, 20+ individual tracks
+        </p>
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))",
@@ -159,8 +177,9 @@ export default function Home({ onShowAuth, setPage }: HomeProps) {
                 textTransform: "uppercase", fontFamily: "'Fira Code',monospace",
                 marginBottom: 8,
               }}>{c.tag}</div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{c.name}</div>
-              <div style={{ fontSize: 12, color: T.muted2, marginTop: 6 }}>Tap to start →</div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{c.name}</div>
+              <div style={{ fontSize: 12, color: T.muted2, marginBottom: 10, lineHeight: 1.45 }}>{c.sub}</div>
+              <div style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>Sign in to start →</div>
             </button>
           ))}
         </div>

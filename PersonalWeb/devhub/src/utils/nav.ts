@@ -19,10 +19,11 @@ export interface NavGroup {
 }
 
 export const NAV: NavGroup[] = [
-  // Top: Home + Dashboard, always visible
+  // Top: Home + Dashboard + Roadmap, always visible
   { section: "", collapsible: false, items: [
     { id: "home",      label: "Home",       icon: "⌂", color: T.accent },
     { id: "dashboard", label: "Dashboard",  icon: "▣", color: T.accent },
+    { id: "roadmap",   label: "Roadmap",    icon: "◈", color: T.accent },
   ]},
 
   // PYTHON

@@ -189,6 +189,11 @@ export function Sidebar({
         {/* Nav */}
         <nav style={{ padding: "8px 0 12px", flex: 1, overflowY: "auto", overflowX: "hidden" }}>
           {NAV.map((group, gi) => {
+            // When user is logged in, hide the "home" nav item — they go straight to dashboard
+            const visibleItems = user
+              ? group.items.filter(item => item.id !== "home")
+              : group.items;
+            if (visibleItems.length === 0) return null;
             const showHeader = !!group.section && group.collapsible !== false;
             const isOpen = showHeader ? !!sections[group.section] : true;
             const showDivider = gi > 0;
@@ -224,7 +229,7 @@ export function Sidebar({
                     </span>
                   </button>
                 )}
-                {isOpen && group.items.map(item => {
+                {isOpen && visibleItems.map(item => {
                   const active = page === item.id;
                   const Icon = ICON_MAP[item.id];
                   return (

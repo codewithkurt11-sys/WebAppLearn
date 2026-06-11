@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Heart, Send } from "lucide-react";
+import { toast } from "sonner";
 import { T } from "../utils/theme";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { supabase } from "../services/supabase";
@@ -95,19 +96,28 @@ export default function Feedback() {
 
   const submit = async () => {
     if (!message.trim()) return;
-    if (getRateLimitCount() >= RATE_LIMIT) return;
+    if (getRateLimitCount() >= RATE_LIMIT) {
+      toast.error("Daily limit reached — try again tomorrow.");
+      return;
+    }
     setBusy(true);
     const newItem = {
       message: message.trim(),
       name: name.trim() || "anon",
       user_id: user?.id,
     };
-    await saveFeedback(newItem);
-    incrementRateLimit();
-    setMessage("");
-    setBusy(false);
-    const fresh = await loadFeedback();
-    setItems(fresh);
+    try {
+      await saveFeedback(newItem);
+      incrementRateLimit();
+      setMessage("");
+      toast.success("Feedback posted — thanks! 🙌");
+      const fresh = await loadFeedback();
+      setItems(fresh);
+    } catch {
+      toast.error("Couldn't post feedback — please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const charsLeft = MAX_CHARS - message.length;

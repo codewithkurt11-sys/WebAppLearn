@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState, useEffect, useCallback } from "react";
+import { Toaster } from "sonner";
 import { AuthProvider }       from "./contexts/AuthContext";
 import { ProgressProvider }   from "./contexts/ProgressContext";
 import { AppCtx, RunCtx }     from "./contexts/AppContext";
@@ -127,7 +128,7 @@ function PageRenderer({ page, theme, setTheme, onShowAuth, setPage }: {
 }
 
 function InnerApp() {
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const isMobile = useWindowWidth() < 900;
   useReduceMotion(); // initialise reduce-motion CSS class from localStorage
 
@@ -177,12 +178,13 @@ function InnerApp() {
     } catch {}
   }, [user]);
 
-  // Auto-redirect on login/logout
+  // Auto-redirect on login/logout — skip while auth is still initialising
   useEffect(() => {
+    if (loading) return;
     if (user && page === "home") setPageRaw("dashboard");
     if (!user && page !== "home") setPageRaw("home");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, loading]);
 
   const appCtx = { page, setPage };
 
@@ -247,6 +249,7 @@ export default function App() {
     <AuthProvider>
       <ProgressProvider>
         <InnerApp />
+        <Toaster position="bottom-right" richColors theme="dark" />
       </ProgressProvider>
     </AuthProvider>
   );

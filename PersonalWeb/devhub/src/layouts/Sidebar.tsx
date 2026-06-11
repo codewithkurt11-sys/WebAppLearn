@@ -278,9 +278,9 @@ export function Sidebar({
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>{shortLabel}</div>
                 <div style={{
-                  fontSize: 9, color: T.accent,
+                  fontSize: 9, color: T.muted,
                   fontFamily: "'Fira Code',monospace", letterSpacing: "0.5px",
-                }}>lv.1</div>
+                }}>member</div>
               </div>
             )}
           </div>

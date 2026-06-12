@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd PersonalWeb/devhub && npm install --legacy-peer-deps && npm run build",
+  "buildCommand": "cd PersonalWeb/devhub && npm install --legacy-peer-deps && npx vite build",
   "outputDirectory": "PersonalWeb/devhub/dist",
-  "installCommand": "echo 'install handled in buildCommand'"
+  "installCommand": "echo skip"
 }

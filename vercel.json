@@ -1,4 +1,6 @@
 {
+  "rootDirectory": "PersonalWeb/devhub",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "PersonalWeb/devhub/dist",
+  "installCommand": "npm install --legacy-peer-deps"
 }

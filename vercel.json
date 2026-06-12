@@ -1,5 +1,3 @@
 {
-  "buildCommand": "echo pre-built",
-  "outputDirectory": "PersonalWeb/devhub/dist",
-  "installCommand": "echo skip"
+  "framework": "vite"
 }

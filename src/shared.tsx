@@ -88,6 +88,10 @@ export function tokenize(code: string, lang = "py"): Token[] {
 }
 
 // ─── PYODIDE SINGLETON ────────────────────────────────────────────
+// Bumped from v0.25.0 → v0.27.1 for better stdlib coverage & performance
+const PYODIDE_VERSION = "v0.27.1";
+const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/${PYODIDE_VERSION}/full/`;
+
 let _pyodide: Promise<any> | null = null;
 let _pyodideLoading = false;
 let _pyodideReady   = false;
@@ -103,13 +107,13 @@ export async function getPyodide() {
         if (!(window as any).loadPyodide) {
           await new Promise<void>((res, rej) => {
             const s = document.createElement("script");
-            s.src = "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js";
+            s.src = `${PYODIDE_CDN}pyodide.js`;
             s.onload = () => res();
             s.onerror = () => rej(new Error("Failed to load Pyodide script"));
             document.head.appendChild(s);
           });
         }
-        const py = await (window as any).loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/" });
+        const py = await (window as any).loadPyodide({ indexURL: PYODIDE_CDN });
         py.runPython("import sys, io\n_buf = io.StringIO()\nsys.stdout = _buf\nsys.stderr = _buf");
         _pyodideLoading = false;
         _pyodideReady   = true;
@@ -192,8 +196,8 @@ function detectRunnability(code: string, lang: string): "runnable" | "terminal" 
 
 const COLLAPSE_THRESHOLD = 20;
 
-export function CodeBlock({ code, lang = "py", title, showLines = false, runnable, explanation }: {
-  code: string; lang?: string; title?: string; showLines?: boolean; runnable?: boolean; explanation?: string[];
+export function CodeBlock({ code, lang = "py", title, showLines = false, runnable }: {
+  code: string; lang?: string; title?: string; showLines?: boolean; runnable?: boolean;
 }) {
   const isMobile   = useWindowWidth() < 900;
   const canRunPage = useContext(RunCtx);
@@ -552,6 +556,7 @@ export function Section({ title, children, color }: { title: string; children: R
 }
 
 // ─── TABS / TABBAR ────────────────────────────────────────────────
+// Note: `Tabs` (no localStorage) was a dead duplicate of `TabBar` — removed.
 export function TabBar({ tabs, active, onChange, pageId }: {
   tabs: Tab[];
   active: string;
@@ -570,28 +575,6 @@ export function TabBar({ tabs, active, onChange, pageId }: {
         <button
           key={tab.id}
           onClick={() => handleChange(tab.id)}
-          style={{
-            padding: "8px 14px", border: "none", background: "transparent",
-            color: active === tab.id ? T.accent : T.muted2,
-            borderBottom: active === tab.id ? `2px solid ${T.accent}` : "2px solid transparent",
-            fontFamily: "'Bricolage Grotesque',sans-serif",
-            fontWeight: active === tab.id ? 700 : 500,
-            fontSize: 12.5, cursor: "pointer", transition: "all .15s",
-            whiteSpace: "nowrap",
-          }}
-        >{tab.label}</button>
-      ))}
-    </div>
-  );
-}
-
-export function Tabs({ tabs, active, onChange }: { tabs: Tab[]; active: string; onChange: (id: string) => void }) {
-  return (
-    <div style={{ display: "flex", gap: 2, padding: "12px 14px 0", borderBottom: `1px solid ${T.border}`, overflowX: "auto" }}>
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
           style={{
             padding: "8px 14px", border: "none", background: "transparent",
             color: active === tab.id ? T.accent : T.muted2,

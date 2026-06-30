@@ -58,7 +58,7 @@ function timeAgo(iso?: string): string {
 async function saveFeedback(item: Omit<FeedbackItem, "id" | "created_at">): Promise<void> {
   if (supabaseEnabled) {
     try {
-      const { error } = await supabase.from("feedback").insert([{ ...item }]);
+      const { error } = await supabase!.from("feedback").insert([{ ...item }]);
       if (error) throw error;
       return;
     } catch {}
@@ -69,7 +69,7 @@ async function saveFeedback(item: Omit<FeedbackItem, "id" | "created_at">): Prom
 }
 
 async function loadFeedback(): Promise<FeedbackItem[]> {
-  if (supabaseEnabled) {
+  if (supabaseEnabled && supabase) {
     try {
       const { data, error } = await supabase
         .from("feedback")

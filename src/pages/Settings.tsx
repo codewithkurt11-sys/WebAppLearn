@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, Trash2, RefreshCw } from "lucide-react";
+import { Copy, Check, Trash2, RefreshCw, LogOut, AlertTriangle } from "lucide-react";
 import type { ThemeKey } from "../utils/theme";
 import { T, THEMES, THEME_ORDER, THEME_META } from "../utils/theme";
 import { useAuth } from "../contexts/AuthContext";
+import { useProgressCtx } from "../contexts/ProgressContext";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useReduceMotion } from "../hooks/useReduceMotion";
+import { toast } from "sonner";
 
 interface SettingsProps {
   theme: ThemeKey;
@@ -18,6 +20,7 @@ const SIZE_KEY = "cif_font_size";
 
 export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps) {
   const { user, signOut } = useAuth();
+  const { clearProgress } = useProgressCtx();
   const isMobile = useWindowWidth() < 900;
   const [reduce, setReduce] = useReduceMotion();
 
@@ -30,6 +33,8 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
   const [copied, setCopied] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem(SIZE_KEY, size); } catch { /* ignore */ }
@@ -46,29 +51,54 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
 
   const copyEmail = async () => {
     if (!user?.email) return;
-    try { await navigator.clipboard.writeText(user.email); setCopied(true); setTimeout(()=>setCopied(false), 1400); }
-    catch { /* ignore */ }
-  };
-
-  const resetProgress = () => {
     try {
-      Object.keys(localStorage)
-        .filter(k => k.startsWith("cif_progress_") || k === "cif_recent_pages")
-        .forEach(k => localStorage.removeItem(k));
+      await navigator.clipboard.writeText(user.email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
     } catch { /* ignore */ }
-    setConfirmReset(false);
-    window.location.reload();
   };
 
-  const deleteAccount = async () => {
+  /**
+   * Bug fix #1 — Reset Progress
+   * Previously filtered for `cif_progress_*` keys which don't exist.
+   * Now calls clearProgress() from ProgressContext, which:
+   *  - Deletes all rows from Supabase user_progress for this user
+   *  - Clears cif_recent_pages, cif_time_spent, and cif_tab_* from localStorage
+   *  - Resets in-memory progress state
+   * No window.location.reload() needed — state is reset via context.
+   */
+  const resetProgress = async () => {
+    setResetting(true);
     try {
+      await clearProgress();
+      toast.success("Progress reset — all lessons cleared.");
+    } catch {
+      toast.error("Something went wrong — try again.");
+    } finally {
+      setResetting(false);
+      setConfirmReset(false);
+    }
+  };
+
+  /**
+   * Bug fix #2 — "Delete Account" was mislabelled and only called signOut().
+   * Renamed to "Sign out & clear data" — an honest description of what it does.
+   * True account deletion requires a Supabase Edge Function (admin.deleteUser),
+   * which cannot be done client-side with the anon key.
+   * No window.location.reload() needed — AuthContext handles the signOut state.
+   */
+  const signOutAndClear = async () => {
+    setSigningOut(true);
+    try {
+      const keep = ["cif_theme", "cif_font_size", "cif_reduce_motion", "cif_sidebar_pinned"];
       Object.keys(localStorage)
-        .filter(k => k.startsWith("cif_"))
+        .filter(k => k.startsWith("cif_") && !keep.includes(k))
         .forEach(k => localStorage.removeItem(k));
     } catch { /* ignore */ }
     await signOut();
+    // AuthContext updates user → null, InnerApp auto-redirects to home
+    setSigningOut(false);
     setConfirmDelete(false);
-    window.location.reload();
   };
 
   const initials = (displayName || user?.email || "··").slice(0, 2).toUpperCase();
@@ -79,6 +109,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
       maxWidth: 860, margin: "0 auto",
       display: "flex", flexDirection: "column", gap: 14,
     }}>
+      {/* Page title */}
       <div style={{ marginBottom: 4 }}>
         <div style={{
           fontFamily: "'Bricolage Grotesque',sans-serif",
@@ -100,6 +131,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontWeight: 800, fontSize: 16,
             fontFamily: "'Bricolage Grotesque',sans-serif",
+            boxShadow: `0 6px 18px ${T.accent}44`,
           }}>{initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <input
@@ -112,7 +144,10 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                 padding: "8px 12px", color: T.text, fontSize: 13,
                 fontFamily: "'Bricolage Grotesque',sans-serif",
                 outline: "none", marginBottom: 6,
+                transition: "border-color .15s",
               }}
+              onFocus={e => (e.currentTarget.style.borderColor = T.accent)}
+              onBlur={e => (e.currentTarget.style.borderColor = T.border)}
             />
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
@@ -140,17 +175,23 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
             </div>
           </div>
         </div>
+
         {!user && <PrimaryBtn onClick={onShowAuth}>Sign in to sync</PrimaryBtn>}
         {user && (
-          <SecondaryBtn onClick={async () => {
-            try {
-              const keep = ["cif_theme", "cif_font_size", "cif_reduce_motion", "cif_sidebar_pinned"];
-              Object.keys(localStorage)
-                .filter(k => k.startsWith("cif_") && !keep.includes(k))
-                .forEach(k => localStorage.removeItem(k));
-            } catch {}
-            await signOut();
-          }}>Sign out</SecondaryBtn>
+          <SecondaryBtn
+            onClick={async () => {
+              try {
+                const keep = ["cif_theme", "cif_font_size", "cif_reduce_motion", "cif_sidebar_pinned"];
+                Object.keys(localStorage)
+                  .filter(k => k.startsWith("cif_") && !keep.includes(k))
+                  .forEach(k => localStorage.removeItem(k));
+              } catch {}
+              await signOut();
+            }}
+            icon={<LogOut size={13} />}
+          >
+            Sign out
+          </SecondaryBtn>
         )}
       </Card>
 
@@ -178,6 +219,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                   boxShadow: active ? `0 0 0 2px ${c.accent}66, 0 8px 24px ${c.accent}33` : "none",
                   transition: "all .2s",
                 }}
+                title={THEME_META[k].desc}
               >
                 {/* mini preview */}
                 <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
@@ -192,6 +234,16 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                   fontSize: 11, fontWeight: 700, color: c.text,
                   fontFamily: "'Bricolage Grotesque',sans-serif",
                 }}>{THEME_META[k].label}</div>
+                {active && (
+                  <div style={{
+                    position: "absolute", top: 6, right: 6,
+                    width: 16, height: 16, borderRadius: "50%",
+                    background: c.accent,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Check size={10} color={c.bg} strokeWidth={3} />
+                  </div>
+                )}
               </button>
             );
           })}
@@ -228,14 +280,30 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
       {/* Progress */}
       <Card>
         <CardTitle>Progress</CardTitle>
+        {user ? (
+          <p style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
+            Resets all lesson completions and quiz scores — both locally and in the cloud.
+          </p>
+        ) : (
+          <p style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
+            Clears recently visited lessons and time-spent data from this browser.
+          </p>
+        )}
         {!confirmReset ? (
-          <SecondaryBtn onClick={() => setConfirmReset(true)} icon={<RefreshCw size={13} />}>
+          <SecondaryBtn
+            onClick={() => setConfirmReset(true)}
+            icon={<RefreshCw size={13} />}
+          >
             Reset progress
           </SecondaryBtn>
         ) : (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, color: T.muted2 }}>Sure? This clears all local progress.</span>
-            <DangerBtn onClick={resetProgress}>Yes, reset</DangerBtn>
+            <span style={{ fontSize: 12, color: T.muted2 }}>
+              {user ? "This deletes all your saved progress. Sure?" : "Clear local progress data?"}
+            </span>
+            <DangerBtn onClick={resetProgress} disabled={resetting}>
+              {resetting ? "Resetting…" : "Yes, reset"}
+            </DangerBtn>
             <SecondaryBtn onClick={() => setConfirmReset(false)}>Cancel</SecondaryBtn>
           </div>
         )}
@@ -245,21 +313,46 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
       {user && (
         <Card danger>
           <CardTitle tone="rose">Danger zone</CardTitle>
-          <div style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
-            Sign out and clear all local data. This cannot be undone.
-          </div>
-          {!confirmDelete ? (
-            <DangerBtn onClick={() => setConfirmDelete(true)} icon={<Trash2 size={13} />}>
-              Delete account
-            </DangerBtn>
-          ) : (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <DangerBtn onClick={deleteAccount}>
-                Confirm delete
-              </DangerBtn>
-              <SecondaryBtn onClick={() => setConfirmDelete(false)}>Cancel</SecondaryBtn>
+
+          {/* Sign out & clear */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: T.muted2, marginBottom: 10, lineHeight: 1.5 }}>
+              <strong style={{ color: T.text }}>Sign out &amp; clear local data</strong>
+              <br />
+              Signs you out and clears all browser-stored preferences and recent pages. Your cloud progress is preserved.
             </div>
-          )}
+            {!confirmDelete ? (
+              <DangerBtn
+                onClick={() => setConfirmDelete(true)}
+                icon={<LogOut size={13} />}
+              >
+                Sign out &amp; clear data
+              </DangerBtn>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: T.muted2 }}>Sign out and clear all local data?</span>
+                <DangerBtn onClick={signOutAndClear} disabled={signingOut}>
+                  {signingOut ? "Signing out…" : "Confirm"}
+                </DangerBtn>
+                <SecondaryBtn onClick={() => setConfirmDelete(false)}>Cancel</SecondaryBtn>
+              </div>
+            )}
+          </div>
+
+          {/* Note about account deletion */}
+          <div style={{
+            padding: "10px 12px",
+            background: `${T.amber}08`,
+            border: `1px solid ${T.amber}30`,
+            borderRadius: 8,
+            display: "flex", gap: 8, alignItems: "flex-start",
+          }}>
+            <AlertTriangle size={14} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 11.5, color: T.muted2, lineHeight: 1.5 }}>
+              <strong style={{ color: T.amber }}>Want to fully delete your account?</strong>
+              {" "}Account deletion requires contacting support — it cannot be done from the browser for security reasons.
+            </div>
+          </div>
         </Card>
       )}
     </div>
@@ -327,7 +420,11 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick?
   );
 }
 
-function SecondaryBtn({ children, onClick, icon }: { children: React.ReactNode; onClick?: () => void; icon?: React.ReactNode }) {
+function SecondaryBtn({ children, onClick, icon }: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  icon?: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -351,19 +448,27 @@ function SecondaryBtn({ children, onClick, icon }: { children: React.ReactNode; 
   );
 }
 
-function DangerBtn({ children, onClick, icon }: { children: React.ReactNode; onClick?: () => void; icon?: React.ReactNode }) {
+function DangerBtn({ children, onClick, icon, disabled }: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         padding: "8px 16px",
-        background: T.rose,
+        background: disabled ? T.border : T.rose,
         border: "none", borderRadius: 10,
         color: "#fff", fontSize: 12.5, fontWeight: 700,
-        cursor: "pointer", transition: "filter .15s",
+        cursor: disabled ? "not-allowed" : "pointer",
+        transition: "filter .15s, background .15s",
         display: "inline-flex", alignItems: "center", gap: 7,
+        opacity: disabled ? 0.6 : 1,
       }}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).style.filter = "brightness(1.1)"}
+      onMouseEnter={e => !disabled && ((e.currentTarget as HTMLElement).style.filter = "brightness(1.1)")}
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.filter = ""}
     >{icon}{children}</button>
   );
@@ -386,6 +491,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
         position: "absolute", top: 3, left: on ? 21 : 3,
         width: 18, height: 18, borderRadius: "50%",
         background: "#fff", transition: "left .2s",
+        boxShadow: "0 1px 4px rgba(0,0,0,.3)",
       }} />
     </button>
   );

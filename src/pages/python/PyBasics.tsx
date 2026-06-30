@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question, Def, TryIt } from "../../shared";
 
@@ -759,7 +760,7 @@ parsed   = json.loads(json_str)     # JSON string → dict
 
 export default function PyBasics() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_py-basics") ?? "vars"; } catch { return "vars"; }
+    return storage.getTab("py-basics") ?? "vars";
   });
   const content: Record<string, React.ReactNode> = {
     vars:<PybVars/>, strings:<PybStrings/>, lists:<PybLists/>, dicts:<PybDicts/>,

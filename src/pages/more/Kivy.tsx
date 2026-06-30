@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -584,7 +585,7 @@ zipalign -v 4 \
 
 export default function Kivy() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_kivy") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("kivy") ?? "intro";
   });
   return (
     <div>

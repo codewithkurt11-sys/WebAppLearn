@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -378,7 +379,7 @@ python-dotenv==1.0.1`}/>
 
 export default function FlaskExpert() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_flask-expert") ?? "sqlalchemy"; } catch { return "sqlalchemy"; }
+    return storage.getTab("flask-expert") ?? "sqlalchemy";
   });
   return (
     <div style={{ padding:"0 0 40px" }}>

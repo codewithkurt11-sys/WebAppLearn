@@ -1,9 +1,22 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+/**
+ * GlobalSearch.tsx
+ *
+ * Fixes / improvements:
+ *  1. Uses storage service for recent searches.
+ *  2. Debounced query state — 120 ms wait prevents re-filtering on every
+ *     keystroke in large navigation trees.
+ *  3. Modal has role="dialog" and aria-modal for screen readers.
+ *  4. Input has aria-label and aria-autocomplete attributes.
+ *  5. Results list has role="listbox"; each row has role="option".
+ *  6. Focus is trapped inside the modal while it is open.
+ */
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { T } from "../utils/theme";
 import { NAV, ALL_ITEMS } from "../utils/nav";
+import { storage } from "../services/storage";
 
-const LS_KEY = "cif_recent_search";
-const MAX_RECENT = 5;
+const MAX_RECENT = 8; // was 5 — more recent items is more useful
 
 interface GlobalSearchProps {
   open: boolean;
@@ -11,42 +24,53 @@ interface GlobalSearchProps {
   onNavigate: (id: string) => void;
 }
 
-function getRecent(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; }
-}
-
-function addRecent(id: string) {
-  try {
-    const prev = getRecent().filter(x => x !== id);
-    localStorage.setItem(LS_KEY, JSON.stringify([id, ...prev].slice(0, MAX_RECENT)));
-  } catch {}
+function addRecent(id: string): void {
+  const prev = storage.getRecentSearch().filter(x => x !== id);
+  storage.setRecentSearch([id, ...prev].slice(0, MAX_RECENT));
 }
 
 export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearchProps) {
-  const [query, setQuery] = useState("");
-  const [recent, setRecent] = useState<string[]>([]);
+  const [rawQuery,   setRawQuery]   = useState("");
+  const [query,      setQuery]      = useState(""); // debounced
+  const [recent,     setRecent]     = useState<string[]>([]);
   const [highlighted, setHighlighted] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const dialogRef   = useRef<HTMLDivElement>(null);
 
+  // Debounce the query so filtering doesn't run on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(rawQuery), 120);
+    return () => clearTimeout(id);
+  }, [rawQuery]);
+
+  // Focus input and load recent searches when modal opens.
   useEffect(() => {
     if (open) {
+      setRawQuery("");
       setQuery("");
-      setRecent(getRecent());
+      setRecent(storage.getRecentSearch());
       setHighlighted(0);
-      setTimeout(() => inputRef.current?.focus(), 60);
+      // rAF ensures the DOM is present before focus.
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
-  const filtered = query.trim()
-    ? ALL_ITEMS.filter(item =>
-        item.label.toLowerCase().includes(query.toLowerCase()) ||
-        item.id.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const filtered = useMemo(() =>
+    query.trim()
+      ? ALL_ITEMS.filter(item =>
+          item.label.toLowerCase().includes(query.toLowerCase()) ||
+          item.id.toLowerCase().includes(query.toLowerCase())
+        )
+      : [],
+    [query]
+  );
 
-  const recentItems = recent
-    .map(id => ALL_ITEMS.find(i => i.id === id))
-    .filter(Boolean) as typeof ALL_ITEMS;
+  const recentItems = useMemo(() =>
+    recent
+      .map(id => ALL_ITEMS.find(i => i.id === id))
+      .filter(Boolean) as typeof ALL_ITEMS,
+    [recent]
+  );
 
   const displayList = query.trim() ? filtered : recentItems;
 
@@ -56,12 +80,19 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
     onClose();
   }, [onNavigate, onClose]);
 
+  // Keyboard navigation inside the modal.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { onClose(); return; }
-      if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted(h => Math.min(h + 1, displayList.length - 1)); }
-      if (e.key === "ArrowUp")   { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)); }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlighted(h => Math.min(h + 1, displayList.length - 1));
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlighted(h => Math.max(h - 1, 0));
+      }
       if (e.key === "Enter" && displayList[highlighted]) {
         navigate(displayList[highlighted].id);
       }
@@ -70,7 +101,29 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
     return () => window.removeEventListener("keydown", onKey);
   }, [open, displayList, highlighted, navigate, onClose]);
 
+  // Reset highlighted when query changes.
   useEffect(() => { setHighlighted(0); }, [query]);
+
+  // Trap focus inside the dialog.
+  useEffect(() => {
+    if (!open || !dialogRef.current) return;
+    const el = dialogRef.current;
+    const focusables = el.querySelectorAll<HTMLElement>(
+      'button, input, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusables[0];
+    const last  = focusables[focusables.length - 1];
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+    };
+    el.addEventListener("keydown", trap);
+    return () => el.removeEventListener("keydown", trap);
+  }, [open]);
 
   if (!open) return null;
 
@@ -85,6 +138,7 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
 
   return (
     <div
+      role="presentation"
       style={{
         position: "fixed", inset: 0, zIndex: 9999,
         background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
@@ -93,35 +147,47 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        width: "min(600px, 94vw)",
-        background: T.bg2,
-        border: `1px solid ${T.border2}`,
-        borderRadius: 16,
-        boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
-        overflow: "hidden",
-      }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search"
+        style={{
+          width: "min(600px, 94vw)",
+          background: T.bg2,
+          border: `1px solid ${T.border2}`,
+          borderRadius: 16,
+          boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
+          overflow: "hidden",
+        }}
+      >
         {/* Input row */}
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
           padding: "14px 18px",
           borderBottom: `1px solid ${T.border}`,
         }}>
-          <span style={{ fontSize: 16, color: T.muted, flexShrink: 0 }}>⌕</span>
+          <span aria-hidden style={{ fontSize: 16, color: T.muted, flexShrink: 0 }}>⌕</span>
           <input
             ref={inputRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
+            value={rawQuery}
+            onChange={e => setRawQuery(e.target.value)}
             placeholder="Search pages and lessons…"
+            aria-label="Search pages and lessons"
+            aria-autocomplete="list"
+            aria-controls="search-results"
+            role="combobox"
+            aria-expanded={displayList.length > 0}
             style={{
               flex: 1, border: "none", outline: "none",
               background: "transparent", color: T.text,
               fontSize: 15, fontFamily: "'Bricolage Grotesque',sans-serif",
             }}
           />
-          {query && (
+          {rawQuery && (
             <button
-              onClick={() => setQuery("")}
+              onClick={() => setRawQuery("")}
+              aria-label="Clear search"
               style={{ background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 13, padding: "0 4px" }}
             >✕</button>
           )}
@@ -133,10 +199,18 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
         </div>
 
         {/* Results */}
-        <div style={{ maxHeight: 420, overflowY: "auto", padding: "8px 0" }}>
+        <div
+          id="search-results"
+          role="listbox"
+          aria-label="Search results"
+          style={{ maxHeight: 420, overflowY: "auto", padding: "8px 0" }}
+        >
           {query.trim() ? (
             filtered.length === 0 ? (
-              <div style={{ padding: "24px 20px", textAlign: "center", color: T.muted, fontSize: 12.5, fontFamily: "'Fira Code',monospace" }}>
+              <div style={{
+                padding: "24px 20px", textAlign: "center",
+                color: T.muted, fontSize: 12.5, fontFamily: "'Fira Code',monospace",
+              }}>
                 // no results for "{query}"
               </div>
             ) : (
@@ -151,7 +225,10 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
               ))
             )
           ) : recentItems.length === 0 ? (
-            <div style={{ padding: "24px 20px", textAlign: "center", color: T.muted, fontSize: 12.5, fontFamily: "'Fira Code',monospace" }}>
+            <div style={{
+              padding: "24px 20px", textAlign: "center",
+              color: T.muted, fontSize: 12.5, fontFamily: "'Fira Code',monospace",
+            }}>
               // search for any page or lesson
             </div>
           ) : (
@@ -162,9 +239,9 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
                   letterSpacing: "2px", textTransform: "uppercase",
                   padding: "6px 18px 4px",
                 }}>
-                  {group.section}
+                  {group.section || "Recent"}
                 </div>
-                {group.items.map((item, ii) => {
+                {group.items.map(item => {
                   const globalIdx = recentItems.findIndex(r => r.id === item.id);
                   return (
                     <SearchRow
@@ -189,7 +266,11 @@ export default function GlobalSearch({ open, onClose, onNavigate }: GlobalSearch
         }}>
           {[["↑↓", "navigate"], ["↵", "open"], ["esc", "close"]].map(([key, label]) => (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <kbd style={{ fontSize: 9, color: T.muted, fontFamily: "'Fira Code',monospace", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 3, padding: "1px 5px" }}>{key}</kbd>
+              <kbd style={{
+                fontSize: 9, color: T.muted, fontFamily: "'Fira Code',monospace",
+                background: T.surface, border: `1px solid ${T.border}`,
+                borderRadius: 3, padding: "1px 5px",
+              }}>{key}</kbd>
               <span style={{ fontSize: 10, color: T.muted }}>{label}</span>
             </div>
           ))}
@@ -208,6 +289,8 @@ function SearchRow({ item, active, onClick, onHover, showRecent }: {
 }) {
   return (
     <button
+      role="option"
+      aria-selected={active}
       onClick={onClick}
       onMouseEnter={onHover}
       style={{
@@ -231,7 +314,7 @@ function SearchRow({ item, active, onClick, onHover, showRecent }: {
         <div style={{ fontSize: 9.5, fontFamily: "'Fira Code',monospace", color: T.muted }}>{item.id}</div>
       </div>
       {showRecent && <span style={{ fontSize: 9, color: T.muted, fontFamily: "'Fira Code',monospace" }}>recent</span>}
-      {active && <span style={{ fontSize: 10, color: item.color }}>→</span>}
+      {active && <span aria-hidden style={{ fontSize: 10, color: item.color }}>→</span>}
     </button>
   );
 }

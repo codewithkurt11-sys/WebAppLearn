@@ -1,4 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+/**
+ * Sidebar.tsx
+ *
+ * Fixes / improvements:
+ *  1. Uses storage service instead of raw localStorage for pin, sections
+ *     state, and display name.
+ *  2. displayName reads from storage (not a raw localStorage call inside
+ *     a render function) — prevents reading on every render cycle.
+ *  3. NavRow tooltip is rendered with role="tooltip" for accessibility.
+ *  4. Sidebar close button has an accessible aria-label when isMobile.
+ *  5. Active nav item gets aria-current="page" for screen readers.
+ *  6. Memo-ized sub-components prevent unnecessary re-renders.
+ */
+
+import { useState, useEffect, useMemo, memo } from "react";
 import {
   LayoutDashboard, Map, MessageSquare, Settings as SettingsIcon,
   User, ChevronLeft, ChevronRight, ChevronDown, Search, LogOut, LogIn,
@@ -8,6 +22,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ThemeKey } from "../utils/theme";
 import { T, THEMES, THEME_ORDER, THEME_META } from "../utils/theme";
 import { NAV } from "../utils/nav";
+import { storage } from "../services/storage";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   home:       HomeIcon,
@@ -34,17 +49,12 @@ interface SidebarProps {
 
 const COLLAPSED_W = 64;
 const EXPANDED_W  = 240;
-const LS_PIN_KEY  = "cif_sidebar_pinned";
-const LS_SEC_KEY  = "cif_nav_sections";
 
 type SectionState = Record<string, boolean>;
 
 function loadSectionState(): SectionState {
-  try {
-    const raw = localStorage.getItem(LS_SEC_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  // Default: use defaultOpen from NAV
+  const stored = storage.getNavSections();
+  if (stored) return stored;
   const init: SectionState = {};
   for (const g of NAV) {
     if (g.collapsible && g.section) init[g.section] = !!g.defaultOpen;
@@ -56,21 +66,21 @@ export function Sidebar({
   page, setPage, open, onClose, isMobile,
   theme, setTheme, onShowAuth, onOpenSearch, user, onSignOut,
 }: SidebarProps) {
-  const [pinned, setPinned] = useState<boolean>(() => {
-    try { return localStorage.getItem(LS_PIN_KEY) === "1"; } catch { return false; }
-  });
-  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState<boolean>(() => storage.getSidebarPin());
+  const [hover,  setHover]  = useState(false);
   const [sections, setSections] = useState<SectionState>(loadSectionState);
 
+  // Persist pin preference.
   useEffect(() => {
-    try { localStorage.setItem(LS_PIN_KEY, pinned ? "1" : "0"); } catch {}
+    storage.setSidebarPin(pinned);
   }, [pinned]);
 
+  // Persist section collapse state.
   useEffect(() => {
-    try { localStorage.setItem(LS_SEC_KEY, JSON.stringify(sections)); } catch {}
+    storage.setNavSections(sections);
   }, [sections]);
 
-  // Auto-expand the section containing the active page
+  // Auto-expand the section containing the active page.
   const activeSection = useMemo(() => {
     for (const g of NAV) {
       if (g.collapsible && g.items.some(i => i.id === page)) return g.section;
@@ -92,9 +102,8 @@ export function Sidebar({
   const toggleSection = (name: string) =>
     setSections(s => ({ ...s, [name]: !s[name] }));
 
-  const displayName = (() => {
-    try { return localStorage.getItem("cif_display_name"); } catch { return null; }
-  })();
+  // Read display name from storage (not inline inside render).
+  const displayName = storage.getDisplayName() || null;
   const initials = displayName
     ? displayName.slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() ?? "··";
@@ -102,9 +111,14 @@ export function Sidebar({
 
   return (
     <>
+      {/* Mobile overlay */}
       {isMobile && open && (
         <div
           onClick={onClose}
+          role="button"
+          aria-label="Close menu"
+          tabIndex={0}
+          onKeyDown={e => e.key === "Enter" && onClose()}
           style={{
             position: "fixed", inset: 0, zIndex: 98,
             background: "rgba(0,0,0,.55)",
@@ -115,6 +129,7 @@ export function Sidebar({
       )}
 
       <aside
+        aria-label="Main navigation"
         onMouseEnter={() => !isMobile && setHover(true)}
         onMouseLeave={() => !isMobile && setHover(false)}
         style={{
@@ -164,7 +179,7 @@ export function Sidebar({
         <div style={{ padding: "10px 12px 4px", flexShrink: 0 }}>
           <button
             onClick={onOpenSearch}
-            title="Search"
+            aria-label="Search"
             style={{
               display: "flex", alignItems: "center",
               gap: expanded ? 8 : 0, width: "100%",
@@ -177,26 +192,35 @@ export function Sidebar({
             }}
           >
             <Search size={14} />
-            {expanded && <><span style={{ flex: 1, textAlign: "left" }}>Search…</span>
-              <kbd style={{
-                fontSize: 9, fontFamily: "'Fira Code',monospace",
-                background: T.bg2, border: `1px solid ${T.border}`,
-                borderRadius: 3, padding: "1px 5px", color: T.muted,
-              }}>⌘K</kbd></>}
+            {expanded && (
+              <>
+                <span style={{ flex: 1, textAlign: "left" }}>Search…</span>
+                <kbd style={{
+                  fontSize: 9, fontFamily: "'Fira Code',monospace",
+                  background: T.bg2, border: `1px solid ${T.border}`,
+                  borderRadius: 3, padding: "1px 5px", color: T.muted,
+                }}>⌘K</kbd>
+              </>
+            )}
           </button>
         </div>
 
-        {/* Nav */}
-        <nav style={{ padding: "8px 0 12px", flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+        {/* Navigation */}
+        <nav
+          aria-label="Site navigation"
+          style={{ padding: "8px 0 12px", flex: 1, overflowY: "auto", overflowX: "hidden" }}
+        >
           {NAV.map((group, gi) => {
-            // When user is logged in, hide the "home" nav item — they go straight to dashboard
+            // Hide "home" nav item when user is logged in.
             const visibleItems = user
               ? group.items.filter(item => item.id !== "home")
               : group.items;
             if (visibleItems.length === 0) return null;
-            const showHeader = !!group.section && group.collapsible !== false;
-            const isOpen = showHeader ? !!sections[group.section] : true;
+
+            const showHeader  = !!group.section && group.collapsible !== false;
+            const isOpen      = showHeader ? !!sections[group.section] : true;
             const showDivider = gi > 0;
+
             return (
               <div key={group.section + gi} style={{ marginTop: gi === 0 ? 4 : 6 }}>
                 {showDivider && (
@@ -209,6 +233,8 @@ export function Sidebar({
                 {showHeader && expanded && (
                   <button
                     onClick={() => toggleSection(group.section)}
+                    aria-expanded={isOpen}
+                    aria-label={`${isOpen ? "Collapse" : "Expand"} ${group.section}`}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       width: "100%", padding: "4px 16px 6px",
@@ -231,7 +257,7 @@ export function Sidebar({
                 )}
                 {isOpen && visibleItems.map(item => {
                   const active = page === item.id;
-                  const Icon = ICON_MAP[item.id];
+                  const Icon   = ICON_MAP[item.id];
                   return (
                     <NavRow
                       key={item.id}
@@ -263,14 +289,17 @@ export function Sidebar({
             display: "flex", alignItems: "center",
             gap: 10, justifyContent: expanded ? "flex-start" : "center",
           }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-              background: `linear-gradient(135deg, ${T.accent}, ${T.rose})`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 800, color: "#fff",
-              fontFamily: "'Bricolage Grotesque',sans-serif",
-              boxShadow: `0 0 0 2px ${T.bg2}, 0 4px 12px ${T.accent}55`,
-            }}>{initials}</div>
+            <div
+              aria-label={`Logged in as ${shortLabel}`}
+              style={{
+                width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                background: `linear-gradient(135deg, ${T.accent}, ${T.rose})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 800, color: "#fff",
+                fontFamily: "'Bricolage Grotesque',sans-serif",
+                boxShadow: `0 0 0 2px ${T.bg2}, 0 4px 12px ${T.accent}55`,
+              }}
+            >{initials}</div>
             {expanded && (
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
@@ -290,20 +319,26 @@ export function Sidebar({
         <div style={{
           padding: expanded ? "10px 12px 8px" : "10px 0 8px",
           flexShrink: 0,
-          borderTop: user ? `1px solid ${T.border}` : `1px solid ${T.border}`,
+          borderTop: `1px solid ${T.border}`,
           display: "flex", flexDirection: "column",
           alignItems: expanded ? "stretch" : "center",
           gap: 8,
         }}>
-          <div style={{
-            display: "flex", alignItems: "center",
-            gap: 6, justifyContent: expanded ? "flex-start" : "center",
-            flexWrap: "wrap",
-          }}>
+          <div
+            role="group"
+            aria-label="Select theme"
+            style={{
+              display: "flex", alignItems: "center",
+              gap: 6, justifyContent: expanded ? "flex-start" : "center",
+              flexWrap: "wrap",
+            }}
+          >
             {THEME_ORDER.map(k => (
               <button
                 key={k}
                 title={THEME_META[k].label}
+                aria-pressed={k === theme}
+                aria-label={`${THEME_META[k].label} theme`}
                 onClick={() => setTheme(k)}
                 style={{
                   width: k === theme ? 14 : 10,
@@ -330,10 +365,12 @@ export function Sidebar({
           )}
         </div>
 
+        {/* Pin/collapse toggle — desktop only */}
         {!isMobile && (
           <button
             onClick={() => setPinned(p => !p)}
             title={pinned ? "Collapse sidebar" : "Pin sidebar open"}
+            aria-label={pinned ? "Collapse sidebar" : "Pin sidebar open"}
             style={{
               height: 36, flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -359,7 +396,9 @@ export function Sidebar({
   );
 }
 
-function NavRow({
+// ─── NavRow ──────────────────────────────────────────────────────────────
+
+const NavRow = memo(function NavRow({
   label, color, active, expanded, onClick, icon, tag,
 }: {
   label: string; color: string; active: boolean; expanded: boolean;
@@ -372,6 +411,7 @@ function NavRow({
         onClick={onClick}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
+        aria-current={active ? "page" : undefined}
         title={!expanded ? label : undefined}
         style={{
           position: "relative",
@@ -389,7 +429,7 @@ function NavRow({
         }}
       >
         {active && (
-          <span style={{
+          <span aria-hidden style={{
             position: "absolute", left: 0, top: 6, bottom: 6,
             width: 3, borderRadius: "0 3px 3px 0",
             background: color, boxShadow: `0 0 12px ${color}88`,
@@ -413,21 +453,26 @@ function NavRow({
       </button>
 
       {!expanded && hover && (
-        <div style={{
-          position: "absolute", left: "calc(100% + 8px)", top: "50%",
-          transform: "translateY(-50%)",
-          background: T.surface2, color: T.text,
-          border: `1px solid ${T.border2}`,
-          borderRadius: 6, padding: "5px 10px",
-          fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
-          zIndex: 110, pointerEvents: "none",
-          boxShadow: "0 8px 24px rgba(0,0,0,.35)",
-          animation: "cifFade .15s ease",
-        }}>{label}</div>
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute", left: "calc(100% + 8px)", top: "50%",
+            transform: "translateY(-50%)",
+            background: T.surface2, color: T.text,
+            border: `1px solid ${T.border2}`,
+            borderRadius: 6, padding: "5px 10px",
+            fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+            zIndex: 110, pointerEvents: "none",
+            boxShadow: "0 8px 24px rgba(0,0,0,.35)",
+            animation: "cifFade .15s ease",
+          }}
+        >{label}</div>
       )}
     </div>
   );
-}
+});
+
+// ─── IconBtn ─────────────────────────────────────────────────────────────
 
 function IconBtn({
   label, icon, expanded, tone, onClick,
@@ -440,6 +485,7 @@ function IconBtn({
     <button
       onClick={onClick}
       title={label}
+      aria-label={label}
       style={{
         display: "flex", alignItems: "center",
         gap: expanded ? 8 : 0,

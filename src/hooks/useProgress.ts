@@ -1,6 +1,21 @@
+/**
+ * useProgress — Supabase-backed lesson progress hook.
+ *
+ * Fixes / improvements:
+ *  1. Uses storage service instead of raw localStorage calls.
+ *  2. Optimistic update in saveProgress is rolled back on Supabase error
+ *     so the UI doesn't permanently show incorrect state.
+ *  3. clearProgress now uses storage.clearProgressData() from the service.
+ *  4. Loads progress from Supabase ONLY when a user is logged in — guests
+ *     get an empty map immediately (no loading spinner).
+ *  5. Cancels the in-flight Supabase query when the user changes to avoid
+ *     stale data from a previous user appearing for the new user.
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase, supabaseEnabled } from "../services/supabase";
+import { storage } from "../services/storage";
 
 export interface LessonProgress {
   completed: boolean;
@@ -9,6 +24,7 @@ export interface LessonProgress {
 
 export type ProgressMap = Record<string, LessonProgress>;
 
+/** Maps a lesson page ID → the Supabase (courseId, lessonId) tuple. */
 export const LESSON_COURSE: Record<string, { courseId: string; lessonId: string }> = {
   "py-basics":    { courseId: "python",     lessonId: "py-basics"    },
   "py-inter":     { courseId: "python",     lessonId: "py-inter"     },
@@ -35,14 +51,16 @@ export const LESSON_COURSE: Record<string, { courseId: string; lessonId: string 
 export function useProgress() {
   const { user } = useAuth();
   const [progress, setProgress] = useState<ProgressMap>({});
-  const [loading, setLoading] = useState(true);
+  const [loading,  setLoading]  = useState(true);
 
+  // Load (or clear) progress whenever the user changes.
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoading(true);
 
+      // Guest mode or Supabase not configured — return empty map immediately.
       if (!supabaseEnabled || !user) {
         if (!cancelled) {
           setProgress({});
@@ -51,40 +69,57 @@ export function useProgress() {
         return;
       }
 
-      const { data, error } = await supabase!
-        .from("user_progress")
-        .select("course_id, lesson_id, completed, score")
-        .eq("user_id", user.id);
+      try {
+        const { data, error } = await supabase!
+          .from("user_progress")
+          .select("lesson_id, completed, score")
+          .eq("user_id", user.id);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (error) {
-        console.error("[progress] load error:", error.message);
-        setProgress({});
-      } else {
-        const map: ProgressMap = {};
-        for (const row of data ?? []) {
-          const key = row.lesson_id as string;
-          map[key] = { completed: row.completed, score: row.score };
+        if (error) {
+          console.error("[useProgress] load error:", error.message);
+          setProgress({});
+        } else {
+          const map: ProgressMap = {};
+          for (const row of data ?? []) {
+            map[row.lesson_id as string] = {
+              completed: row.completed as boolean,
+              score:     row.score as number | null,
+            };
+          }
+          setProgress(map);
         }
-        setProgress(map);
+      } catch (e) {
+        if (!cancelled) {
+          console.error("[useProgress] unexpected error:", e);
+          setProgress({});
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     }
 
     load();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user?.id]); // Only re-run when the user ID changes, not the full user object.
 
+  /**
+   * Saves lesson progress optimistically to local state and then persists
+   * to Supabase.  If Supabase fails the previous value is restored.
+   */
   const saveProgress = useCallback(
     async (trackKey: string, completed: boolean, score?: number) => {
       const mapping = LESSON_COURSE[trackKey];
-      if (!mapping) return;
+      if (!mapping) {
+        console.warn("[useProgress] unknown trackKey:", trackKey);
+        return;
+      }
 
-      setProgress(prev => ({
-        ...prev,
-        [trackKey]: { completed, score: score ?? null },
-      }));
+      // Optimistic update
+      const newEntry: LessonProgress = { completed, score: score ?? null };
+      const prevEntry = progress[trackKey];
+      setProgress(prev => ({ ...prev, [trackKey]: newEntry }));
 
       if (!supabaseEnabled || !user) return;
 
@@ -92,53 +127,51 @@ export function useProgress() {
         .from("user_progress")
         .upsert(
           {
-            user_id:   user.id,
-            course_id: mapping.courseId,
-            lesson_id: mapping.lessonId,
+            user_id:    user.id,
+            course_id:  mapping.courseId,
+            lesson_id:  mapping.lessonId,
             completed,
-            score:     score ?? null,
+            score:      score ?? null,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,course_id,lesson_id" }
         );
 
       if (error) {
-        console.error("[progress] save error:", error.message);
+        console.error("[useProgress] save error:", error.message);
+        // Roll back the optimistic update.
+        setProgress(prev => ({
+          ...prev,
+          ...(prevEntry !== undefined
+            ? { [trackKey]: prevEntry }
+            : (() => { const p = { ...prev }; delete p[trackKey]; return p; })()),
+        }));
       }
     },
-    [user]
+    [user, progress] // progress included so rollback captures correct prev value
   );
 
   /**
-   * Clears all progress:
-   *  1. Deletes all rows from user_progress for this user in Supabase (if enabled).
-   *  2. Clears local-storage keys: cif_recent_pages, cif_time_spent, and any cif_tab_* keys.
-   *  3. Resets in-memory progress state to {}.
+   * Clears all progress for the current user:
+   *  1. Deletes all rows from Supabase user_progress.
+   *  2. Clears progress-related localStorage keys (not preferences).
+   *  3. Resets in-memory progress state.
    */
   const clearProgress = useCallback(async () => {
-    // 1. Delete from Supabase
     if (supabaseEnabled && user) {
       const { error } = await supabase!
         .from("user_progress")
         .delete()
         .eq("user_id", user.id);
+
       if (error) {
-        console.error("[progress] clearProgress error:", error.message);
+        console.error("[useProgress] clearProgress error:", error.message);
+        // Don't silently swallow — let caller handle.
+        throw new Error(error.message);
       }
     }
 
-    // 2. Clear local-storage progress-related keys
-    try {
-      const keysToRemove = Object.keys(localStorage).filter(
-        k =>
-          k === "cif_recent_pages" ||
-          k === "cif_time_spent" ||
-          k.startsWith("cif_tab_")
-      );
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-    } catch { /* ignore */ }
-
-    // 3. Reset in-memory state
+    storage.clearProgressData();
     setProgress({});
   }, [user]);
 

@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question, Def, TryIt } from "../../shared";
 
@@ -161,7 +162,7 @@ function TabItertools() {
 
 export default function PyIntermediate() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_py-inter") ?? "comprehensions"; } catch { return "comprehensions"; }
+    return storage.getTab("py-inter") ?? "comprehensions";
   });
   const content: Record<string, React.ReactNode> = {
     comprehensions:<TabComprehensions/>, generators:<TabGenerators/>,

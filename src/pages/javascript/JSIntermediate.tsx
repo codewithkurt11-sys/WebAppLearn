@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -411,7 +412,7 @@ console.log(expensive);  // { apple: 1.2, cherry: 3.0 }`}/>
 
 export default function JSIntermediate() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_js-inter") ?? "promises"; } catch { return "promises"; }
+    return storage.getTab("js-inter") ?? "promises";
   });
   return (
     <div style={{ padding:"0 0 40px" }}>

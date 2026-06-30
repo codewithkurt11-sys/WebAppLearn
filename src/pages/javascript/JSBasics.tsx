@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question, Def, TryIt } from "../../shared";
 
@@ -225,7 +226,7 @@ function TabAsync() {
 
 export default function JSBasics() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_js-basics") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("js-basics") ?? "intro";
   });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, vars:<TabVars/>, funcs:<TabFuncs/>,

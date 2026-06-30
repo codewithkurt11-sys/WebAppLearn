@@ -5,6 +5,8 @@ interface ProgressCtxType {
   progress: ProgressMap;
   loading: boolean;
   saveProgress: (trackKey: string, completed: boolean, score?: number) => Promise<void>;
+  /** Deletes all progress from Supabase + clears local-storage progress keys + resets in-memory state. */
+  clearProgress: () => Promise<void>;
 }
 
 const ProgressCtx = createContext<ProgressCtxType | null>(null);

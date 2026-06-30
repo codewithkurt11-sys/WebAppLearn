@@ -51,7 +51,7 @@ export function useProgress() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from("user_progress")
         .select("course_id, lesson_id, completed, score")
         .eq("user_id", user.id);
@@ -88,7 +88,7 @@ export function useProgress() {
 
       if (!supabaseEnabled || !user) return;
 
-      const { error } = await supabase
+      const { error } = await supabase!
         .from("user_progress")
         .upsert(
           {
@@ -109,5 +109,38 @@ export function useProgress() {
     [user]
   );
 
-  return { progress, loading, saveProgress };
+  /**
+   * Clears all progress:
+   *  1. Deletes all rows from user_progress for this user in Supabase (if enabled).
+   *  2. Clears local-storage keys: cif_recent_pages, cif_time_spent, and any cif_tab_* keys.
+   *  3. Resets in-memory progress state to {}.
+   */
+  const clearProgress = useCallback(async () => {
+    // 1. Delete from Supabase
+    if (supabaseEnabled && user) {
+      const { error } = await supabase!
+        .from("user_progress")
+        .delete()
+        .eq("user_id", user.id);
+      if (error) {
+        console.error("[progress] clearProgress error:", error.message);
+      }
+    }
+
+    // 2. Clear local-storage progress-related keys
+    try {
+      const keysToRemove = Object.keys(localStorage).filter(
+        k =>
+          k === "cif_recent_pages" ||
+          k === "cif_time_spent" ||
+          k.startsWith("cif_tab_")
+      );
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch { /* ignore */ }
+
+    // 3. Reset in-memory state
+    setProgress({});
+  }, [user]);
+
+  return { progress, loading, saveProgress, clearProgress };
 }

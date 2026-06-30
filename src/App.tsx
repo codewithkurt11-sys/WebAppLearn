@@ -85,6 +85,9 @@ function PageRenderer({ page, theme, setTheme, onShowAuth, setPage }: {
   onShowAuth: () => void;
   setPage: (id: string) => void;
 }) {
+  // canRun controls whether CodeBlocks on lesson pages show the ▶ run button.
+  // Kept as a constant (true) for now — wire to a feature flag or user setting
+  // in the future if you want to gate code execution.
   const canRun = true;
 
   return (

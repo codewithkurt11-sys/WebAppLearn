@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -191,7 +192,7 @@ function TabEthics() {
 
 export default function WebScraping() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_scraping") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("scraping") ?? "intro";
   });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, requests:<TabRequests/>, bs4:<TabBS4/>,

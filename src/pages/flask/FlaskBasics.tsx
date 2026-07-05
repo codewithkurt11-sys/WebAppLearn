@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question, Def, TryIt } from "../../shared";
 
@@ -279,7 +280,7 @@ function TabTemplates() {
 
 export default function FlaskBasics() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_flask-basics") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("flask-basics") ?? "intro";
   });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, testf:<TabTestf/>, routes:<TabRoutes/>,

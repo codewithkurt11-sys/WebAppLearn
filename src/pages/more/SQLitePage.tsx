@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -150,7 +151,7 @@ function TabFlask() {
 
 export default function SQLitePage() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_sqlite") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("sqlite") ?? "intro";
   });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, create:<TabCreate/>, select:<TabSelect/>,

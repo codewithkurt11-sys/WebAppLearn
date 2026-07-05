@@ -5,6 +5,7 @@ export { NAV, ALL_ITEMS }              from "./utils/nav";
 export type { NavItem, NavGroup, AppCtxType } from "./types";
 export { AppCtx, useApp, RunCtx }       from "./contexts/AppContext";
 import { useProgressCtx }               from "./contexts/ProgressContext";
+import { storage }                      from "./services/storage";
 
 // ─── LOCAL IMPORTS ─────────────────────────────────────────────────
 import type { ReactNode } from "react";
@@ -273,19 +274,9 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
     navigator.clipboard.writeText(code.trim()).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-      const toast = document.createElement("div");
-      toast.textContent = "Copied!";
-      toast.style.cssText = `
-        position: fixed; bottom: 24px; right: 24px;
-        background: ${T.green}; color: ${T.bg};
-        padding: 8px 16px; border-radius: 8px;
-        font-size: 12px; font-family: 'Fira Code', monospace;
-        font-weight: 600; z-index: 9999;
-        animation: fadeInUp 0.2s ease;
-        pointer-events: none;
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 1800);
+    }).catch(() => {
+      // Clipboard API might not be available in some iframe sandboxes.
+      // Silently ignore — the copy button just won't toggle.
     });
   };
 
@@ -452,16 +443,22 @@ export function Quiz({ questions, trackKey, trackId }: { questions: Question[]; 
   const [saved, setSaved]       = useState(false);
   const { saveProgress } = useProgressCtx();
 
-  const score = submitted
-    ? questions.reduce((n, q, i) => n + (answers[i] === q.ans ? 1 : 0), 0)
-    : 0;
+  // BUG FIX: previously `score` was computed from `submitted` which was
+  // still `false` when handleSubmit ran, causing saveProgress to always
+  // receive score=0.  Now we compute the score from answers directly.
+  const computeScore = () =>
+    questions.reduce((n, q, i) => n + (answers[i] === q.ans ? 1 : 0), 0);
+
+  const score = submitted ? computeScore() : 0;
 
   const handleSubmit = async () => {
+    // Compute score BEFORE setting submitted so we capture the correct value.
+    const finalScore = computeScore();
     setSubmit(true);
-    const pct = Math.round((score / questions.length) * 100);
+    const pct = Math.round((finalScore / questions.length) * 100);
     if (trackKey) {
       setSaving(true);
-      await saveProgress(trackKey, score === questions.length, pct);
+      await saveProgress(trackKey, finalScore === questions.length, pct);
       setSaving(false);
       setSaved(true);
     }
@@ -566,7 +563,7 @@ export function TabBar({ tabs, active, onChange, pageId }: {
   const handleChange = (id: string) => {
     onChange(id);
     if (pageId) {
-      try { localStorage.setItem(`cif_tab_${pageId}`, id); } catch {}
+      storage.setTab(pageId, id);
     }
   };
   return (

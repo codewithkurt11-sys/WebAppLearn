@@ -1,8 +1,16 @@
+/**
+ * useReduceMotion — persists the reduce-motion preference via StorageService.
+ *
+ * Changes from original:
+ *  - Uses storage.getReduceMotion() / storage.setReduceMotion() instead of
+ *    raw localStorage calls.
+ *  - initReduceMotion() similarly uses the service.
+ */
+
 import { useState, useEffect } from "react";
+import { storage } from "../services/storage";
 
-const LS_KEY = "cif_reduce_motion";
-
-function applyReduceMotion(reduced: boolean) {
+function applyReduceMotion(reduced: boolean): void {
   if (reduced) {
     document.documentElement.setAttribute("data-reduce-motion", "true");
   } else {
@@ -11,12 +19,10 @@ function applyReduceMotion(reduced: boolean) {
 }
 
 export function useReduceMotion(): [boolean, (v: boolean) => void] {
-  const [reduced, setReduced] = useState<boolean>(() => {
-    try { return localStorage.getItem(LS_KEY) === "1"; } catch { return false; }
-  });
+  const [reduced, setReduced] = useState<boolean>(() => storage.getReduceMotion());
 
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, reduced ? "1" : "0"); } catch {}
+    storage.setReduceMotion(reduced);
     applyReduceMotion(reduced);
   }, [reduced]);
 
@@ -24,13 +30,10 @@ export function useReduceMotion(): [boolean, (v: boolean) => void] {
 }
 
 export function getReduceMotion(): boolean {
-  try { return localStorage.getItem(LS_KEY) === "1"; } catch { return false; }
+  return storage.getReduceMotion();
 }
 
-/** Call once on app start to restore persisted reduce-motion preference */
-export function initReduceMotion() {
-  try {
-    const stored = localStorage.getItem(LS_KEY) === "1";
-    applyReduceMotion(stored);
-  } catch {}
+/** Call once on app start to restore persisted reduce-motion preference. */
+export function initReduceMotion(): void {
+  applyReduceMotion(storage.getReduceMotion());
 }

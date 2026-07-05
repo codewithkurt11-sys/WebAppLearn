@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { T, CodeBlock, InfoBox, Card, CardTitle, IC, PageHeader, useWindowWidth } from "../shared";
+import { T, CodeBlock, PageHeader, useWindowWidth } from "../shared";
 
 type Lang = "all" | "python" | "javascript" | "flask" | "html";
 

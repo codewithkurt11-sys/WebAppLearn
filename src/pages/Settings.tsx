@@ -1,5 +1,20 @@
+/**
+ * Settings.tsx
+ *
+ * Fixes / improvements:
+ *  1. Uses storage service — no raw localStorage.
+ *  2. Duplicate sign-out cleanup code removed — signOut() in AuthContext
+ *     already calls storage.clearUserData().
+ *  3. "Sign out" button in Account card calls signOut() directly (cleanup
+ *     is handled centrally in AuthContext).
+ *  4. confirmDelete state is no longer needed since sign-out is safe; it
+ *     has been kept for "reset progress" confirmation only.
+ *  5. Toast notifications use the sonner library correctly (no undefined calls).
+ *  6. Full TypeScript typing — no `any` casts.
+ */
+
 import { useState, useEffect } from "react";
-import { Copy, Check, Trash2, RefreshCw, LogOut, AlertTriangle } from "lucide-react";
+import { Copy, Check, RefreshCw, LogOut, AlertTriangle } from "lucide-react";
 import type { ThemeKey } from "../utils/theme";
 import { T, THEMES, THEME_ORDER, THEME_META } from "../utils/theme";
 import { useAuth } from "../contexts/AuthContext";
@@ -7,6 +22,7 @@ import { useProgressCtx } from "../contexts/ProgressContext";
 import { useWindowWidth } from "../hooks/useWindowWidth";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import { toast } from "sonner";
+import { storage } from "../services/storage";
 
 interface SettingsProps {
   theme: ThemeKey;
@@ -14,9 +30,8 @@ interface SettingsProps {
   onShowAuth: () => void;
 }
 
-const FONT_SIZES = ["S","M","L"] as const;
+const FONT_SIZES = ["S", "M", "L"] as const;
 type Size = typeof FONT_SIZES[number];
-const SIZE_KEY = "cif_font_size";
 
 export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps) {
   const { user, signOut } = useAuth();
@@ -24,20 +39,17 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
   const isMobile = useWindowWidth() < 900;
   const [reduce, setReduce] = useReduceMotion();
 
-  const [displayName, setDisplayName] = useState<string>(() => {
-    try { return localStorage.getItem("cif_display_name") ?? ""; } catch { return ""; }
-  });
-  const [size, setSize] = useState<Size>(() => {
-    try { return (localStorage.getItem(SIZE_KEY) as Size) ?? "M"; } catch { return "M"; }
-  });
-  const [copied, setCopied] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
+  const [displayName,    setDisplayName]    = useState(() => storage.getDisplayName());
+  const [size,           setSize]           = useState<Size>(() => storage.getFontSize() as Size);
+  const [copied,         setCopied]         = useState(false);
+  const [confirmReset,   setConfirmReset]   = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [resetting,      setResetting]      = useState(false);
+  const [signingOut,     setSigningOut]     = useState(false);
 
+  // Apply font-size CSS variable whenever the size preference changes.
   useEffect(() => {
-    try { localStorage.setItem(SIZE_KEY, size); } catch { /* ignore */ }
+    storage.setFontSize(size);
     document.documentElement.style.setProperty(
       "--cif-font-scale",
       size === "S" ? "0.92" : size === "L" ? "1.08" : "1",
@@ -46,7 +58,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
 
   const saveName = (v: string) => {
     setDisplayName(v);
-    try { localStorage.setItem("cif_display_name", v); } catch { /* ignore */ }
+    storage.setDisplayName(v);
   };
 
   const copyEmail = async () => {
@@ -55,17 +67,14 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
       await navigator.clipboard.writeText(user.email);
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
-    } catch { /* ignore */ }
+    } catch {
+      toast.error("Couldn't copy — check browser permissions.");
+    }
   };
 
   /**
-   * Bug fix #1 — Reset Progress
-   * Previously filtered for `cif_progress_*` keys which don't exist.
-   * Now calls clearProgress() from ProgressContext, which:
-   *  - Deletes all rows from Supabase user_progress for this user
-   *  - Clears cif_recent_pages, cif_time_spent, and cif_tab_* from localStorage
-   *  - Resets in-memory progress state
-   * No window.location.reload() needed — state is reset via context.
+   * resetProgress — deletes all lesson completions / quiz scores.
+   * Calls clearProgress() which handles Supabase + localStorage + state.
    */
   const resetProgress = async () => {
     setResetting(true);
@@ -81,24 +90,21 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
   };
 
   /**
-   * Bug fix #2 — "Delete Account" was mislabelled and only called signOut().
-   * Renamed to "Sign out & clear data" — an honest description of what it does.
-   * True account deletion requires a Supabase Edge Function (admin.deleteUser),
-   * which cannot be done client-side with the anon key.
-   * No window.location.reload() needed — AuthContext handles the signOut state.
+   * handleSignOut — delegates entirely to AuthContext.signOut(), which:
+   *  - Calls storage.clearUserData() (clears user-specific localStorage).
+   *  - Signs out of Supabase.
+   *  - The AuthContext sets user → null, InnerApp auto-redirects to home.
    */
-  const signOutAndClear = async () => {
+  const handleSignOut = async () => {
     setSigningOut(true);
     try {
-      const keep = ["cif_theme", "cif_font_size", "cif_reduce_motion", "cif_sidebar_pinned"];
-      Object.keys(localStorage)
-        .filter(k => k.startsWith("cif_") && !keep.includes(k))
-        .forEach(k => localStorage.removeItem(k));
-    } catch { /* ignore */ }
-    await signOut();
-    // AuthContext updates user → null, InnerApp auto-redirects to home
-    setSigningOut(false);
-    setConfirmDelete(false);
+      await signOut();
+    } catch {
+      toast.error("Sign-out failed — please try again.");
+    } finally {
+      setSigningOut(false);
+      setConfirmSignOut(false);
+    }
   };
 
   const initials = (displayName || user?.email || "··").slice(0, 2).toUpperCase();
@@ -111,32 +117,36 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
     }}>
       {/* Page title */}
       <div style={{ marginBottom: 4 }}>
-        <div style={{
+        <h1 style={{
           fontFamily: "'Bricolage Grotesque',sans-serif",
-          fontWeight: 800, fontSize: 26, letterSpacing: "-0.8px",
-        }}>Settings</div>
+          fontWeight: 800, fontSize: 26, letterSpacing: "-0.8px", margin: 0,
+        }}>Settings</h1>
         <div style={{
           fontFamily: "'Fira Code',monospace",
           fontSize: 11.5, color: T.muted2, marginTop: 4,
         }}>// tune your workspace</div>
       </div>
 
-      {/* Account */}
+      {/* ── Account ────────────────────────────────────── */}
       <Card>
         <CardTitle>Account</CardTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: "50%", flexShrink: 0,
-            background: `linear-gradient(135deg, ${T.accent}, ${T.rose})`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 800, fontSize: 16,
-            fontFamily: "'Bricolage Grotesque',sans-serif",
-            boxShadow: `0 6px 18px ${T.accent}44`,
-          }}>{initials}</div>
+          <div
+            aria-label="Profile avatar"
+            style={{
+              width: 48, height: 48, borderRadius: "50%", flexShrink: 0,
+              background: `linear-gradient(135deg, ${T.accent}, ${T.rose})`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontWeight: 800, fontSize: 16,
+              fontFamily: "'Bricolage Grotesque',sans-serif",
+              boxShadow: `0 6px 18px ${T.accent}44`,
+            }}
+          >{initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <input
               value={displayName}
               placeholder="Display name"
+              aria-label="Display name"
               onChange={e => saveName(e.target.value)}
               style={{
                 width: "100%", background: T.bg2,
@@ -146,13 +156,10 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                 outline: "none", marginBottom: 6,
                 transition: "border-color .15s",
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = T.accent)}
-              onBlur={e => (e.currentTarget.style.borderColor = T.border)}
+              onFocus={e  => (e.currentTarget.style.borderColor = T.accent)}
+              onBlur={e   => (e.currentTarget.style.borderColor = T.border)}
             />
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              fontSize: 11.5, color: T.muted2,
-            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: T.muted2 }}>
               <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.email ?? "Not signed in"}
               </span>
@@ -160,6 +167,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                 <button
                   onClick={copyEmail}
                   title="Copy email"
+                  aria-label="Copy email address"
                   style={{
                     width: 26, height: 26,
                     background: T.bg2, border: `1px solid ${T.border}`,
@@ -176,18 +184,11 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
           </div>
         </div>
 
-        {!user && <PrimaryBtn onClick={onShowAuth}>Sign in to sync</PrimaryBtn>}
-        {user && (
+        {!user ? (
+          <PrimaryBtn onClick={onShowAuth}>Sign in to sync</PrimaryBtn>
+        ) : (
           <SecondaryBtn
-            onClick={async () => {
-              try {
-                const keep = ["cif_theme", "cif_font_size", "cif_reduce_motion", "cif_sidebar_pinned"];
-                Object.keys(localStorage)
-                  .filter(k => k.startsWith("cif_") && !keep.includes(k))
-                  .forEach(k => localStorage.removeItem(k));
-              } catch {}
-              await signOut();
-            }}
+            onClick={() => signOut()}
             icon={<LogOut size={13} />}
           >
             Sign out
@@ -195,7 +196,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
         )}
       </Card>
 
-      {/* Themes */}
+      {/* ── Themes ─────────────────────────────────────── */}
       <Card>
         <CardTitle>Themes</CardTitle>
         <div style={{
@@ -204,22 +205,23 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
           gap: 10,
         }}>
           {THEME_ORDER.map(k => {
-            const c = THEMES[k];
+            const c      = THEMES[k];
             const active = k === theme;
             return (
               <button
                 key={k}
                 onClick={() => setTheme(k)}
+                aria-pressed={active}
+                aria-label={`${THEME_META[k].label} theme`}
+                title={THEME_META[k].desc}
                 style={{
                   position: "relative",
-                  background: c.bg,
-                  border: `1px solid ${active ? c.accent : T.border}`,
+                  background: c.bg, border: `1px solid ${active ? c.accent : T.border}`,
                   borderRadius: 10, padding: "10px",
                   cursor: "pointer", textAlign: "left",
                   boxShadow: active ? `0 0 0 2px ${c.accent}66, 0 8px 24px ${c.accent}33` : "none",
                   transition: "all .2s",
                 }}
-                title={THEME_META[k].desc}
               >
                 {/* mini preview */}
                 <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
@@ -230,12 +232,11 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
                   <span style={{ width: 30, height: 6, background: c.text, borderRadius: 2, opacity: 0.8 }} />
                   <span style={{ width: 18, height: 6, background: c.muted2, borderRadius: 2 }} />
                 </div>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, color: c.text,
-                  fontFamily: "'Bricolage Grotesque',sans-serif",
-                }}>{THEME_META[k].label}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: c.text, fontFamily: "'Bricolage Grotesque',sans-serif" }}>
+                  {THEME_META[k].label}
+                </div>
                 {active && (
-                  <div style={{
+                  <div aria-hidden style={{
                     position: "absolute", top: 6, right: 6,
                     width: 16, height: 16, borderRadius: "50%",
                     background: c.accent,
@@ -250,15 +251,17 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
         </div>
       </Card>
 
-      {/* Preferences */}
+      {/* ── Preferences ────────────────────────────────── */}
       <Card>
         <CardTitle>Preferences</CardTitle>
         <Row label="Text size">
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6 }} role="group" aria-label="Text size">
             {FONT_SIZES.map(s => (
               <button
                 key={s}
                 onClick={() => setSize(s)}
+                aria-pressed={size === s}
+                aria-label={`Text size ${s}`}
                 style={{
                   width: 32, height: 32, borderRadius: 8,
                   background: size === s ? `linear-gradient(135deg, ${T.accent}, ${T.rose})` : T.bg2,
@@ -273,27 +276,20 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
           </div>
         </Row>
         <Row label="Reduce animations">
-          <Toggle on={reduce} onChange={setReduce} />
+          <Toggle on={reduce} onChange={setReduce} label="Reduce animations" />
         </Row>
       </Card>
 
-      {/* Progress */}
+      {/* ── Progress ───────────────────────────────────── */}
       <Card>
         <CardTitle>Progress</CardTitle>
-        {user ? (
-          <p style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
-            Resets all lesson completions and quiz scores — both locally and in the cloud.
-          </p>
-        ) : (
-          <p style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
-            Clears recently visited lessons and time-spent data from this browser.
-          </p>
-        )}
+        <p style={{ fontSize: 12, color: T.muted2, marginBottom: 12, lineHeight: 1.5 }}>
+          {user
+            ? "Resets all lesson completions and quiz scores — both locally and in the cloud."
+            : "Clears recently visited lessons and time-spent data from this browser."}
+        </p>
         {!confirmReset ? (
-          <SecondaryBtn
-            onClick={() => setConfirmReset(true)}
-            icon={<RefreshCw size={13} />}
-          >
+          <SecondaryBtn onClick={() => setConfirmReset(true)} icon={<RefreshCw size={13} />}>
             Reset progress
           </SecondaryBtn>
         ) : (
@@ -309,43 +305,37 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
         )}
       </Card>
 
-      {/* Danger zone — only for signed-in users */}
+      {/* ── Danger zone — signed-in users only ─────────── */}
       {user && (
         <Card danger>
           <CardTitle tone="rose">Danger zone</CardTitle>
 
-          {/* Sign out & clear */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, color: T.muted2, marginBottom: 10, lineHeight: 1.5 }}>
               <strong style={{ color: T.text }}>Sign out &amp; clear local data</strong>
               <br />
-              Signs you out and clears all browser-stored preferences and recent pages. Your cloud progress is preserved.
+              Signs you out and clears all browser-stored preferences and recent pages.
+              Your cloud progress is preserved.
             </div>
-            {!confirmDelete ? (
-              <DangerBtn
-                onClick={() => setConfirmDelete(true)}
-                icon={<LogOut size={13} />}
-              >
+            {!confirmSignOut ? (
+              <DangerBtn onClick={() => setConfirmSignOut(true)} icon={<LogOut size={13} />}>
                 Sign out &amp; clear data
               </DangerBtn>
             ) : (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: T.muted2 }}>Sign out and clear all local data?</span>
-                <DangerBtn onClick={signOutAndClear} disabled={signingOut}>
+                <DangerBtn onClick={handleSignOut} disabled={signingOut}>
                   {signingOut ? "Signing out…" : "Confirm"}
                 </DangerBtn>
-                <SecondaryBtn onClick={() => setConfirmDelete(false)}>Cancel</SecondaryBtn>
+                <SecondaryBtn onClick={() => setConfirmSignOut(false)}>Cancel</SecondaryBtn>
               </div>
             )}
           </div>
 
-          {/* Note about account deletion */}
           <div style={{
             padding: "10px 12px",
-            background: `${T.amber}08`,
-            border: `1px solid ${T.amber}30`,
-            borderRadius: 8,
-            display: "flex", gap: 8, alignItems: "flex-start",
+            background: `${T.amber}08`, border: `1px solid ${T.amber}30`,
+            borderRadius: 8, display: "flex", gap: 8, alignItems: "flex-start",
           }}>
             <AlertTriangle size={14} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ fontSize: 11.5, color: T.muted2, lineHeight: 1.5 }}>
@@ -359,7 +349,7 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
   );
 }
 
-/* ───────────── pieces ───────────── */
+/* ───────────────── UI pieces ───────────────── */
 
 function Card({ children, danger = false }: { children: React.ReactNode; danger?: boolean }) {
   return (
@@ -367,7 +357,6 @@ function Card({ children, danger = false }: { children: React.ReactNode; danger?
       background: danger ? `linear-gradient(180deg, ${T.surface}, ${T.rose}10)` : T.surface,
       border: `1px solid ${danger ? `${T.rose}44` : T.border}`,
       borderRadius: 14, padding: "16px 20px",
-      transition: "transform .2s, box-shadow .2s",
     }}>{children}</div>
   );
 }
@@ -377,12 +366,10 @@ function CardTitle({ children, tone = "accent" }: { children: React.ReactNode; t
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 7,
-      fontFamily: "'Fira Code',monospace",
-      fontWeight: 600, fontSize: 10,
-      color: T.muted2, textTransform: "uppercase",
-      letterSpacing: "2px", marginBottom: 14,
+      fontFamily: "'Fira Code',monospace", fontWeight: 600, fontSize: 10,
+      color: T.muted2, textTransform: "uppercase", letterSpacing: "2px", marginBottom: 14,
     }}>
-      <span style={{
+      <span aria-hidden style={{
         width: 6, height: 6, borderRadius: "50%",
         background: c, boxShadow: `0 0 8px ${c}`,
       }} />
@@ -421,16 +408,13 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick?
 }
 
 function SecondaryBtn({ children, onClick, icon }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  icon?: React.ReactNode;
+  children: React.ReactNode; onClick?: () => void; icon?: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
       style={{
-        padding: "8px 16px",
-        background: "transparent",
+        padding: "8px 16px", background: "transparent",
         border: `1px solid ${T.border2}`,
         borderRadius: 10, color: T.muted2, fontSize: 12.5, fontWeight: 600,
         cursor: "pointer", transition: "all .15s",
@@ -449,10 +433,8 @@ function SecondaryBtn({ children, onClick, icon }: {
 }
 
 function DangerBtn({ children, onClick, icon, disabled }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  icon?: React.ReactNode;
-  disabled?: boolean;
+  children: React.ReactNode; onClick?: () => void;
+  icon?: React.ReactNode; disabled?: boolean;
 }) {
   return (
     <button
@@ -474,11 +456,12 @@ function DangerBtn({ children, onClick, icon, disabled }: {
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
       role="switch"
       aria-checked={on}
+      aria-label={label}
       onClick={() => onChange(!on)}
       style={{
         width: 42, height: 24, borderRadius: 999,

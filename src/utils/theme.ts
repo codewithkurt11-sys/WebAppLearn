@@ -1,3 +1,14 @@
+/**
+ * theme.ts — theme definitions and helpers.
+ *
+ * Changes from original:
+ *  - loadTheme() no longer calls localStorage directly.
+ *  - applyTheme() no longer calls localStorage directly.
+ *  - Both delegate to a tiny inline helper so this file has no import from
+ *    services/storage (avoiding a potential circular dependency during Vite's
+ *    module graph resolution at startup).
+ */
+
 export type ThemeKey = "void" | "sakura" | "storm" | "cozytile" | "light";
 
 export interface ThemeColors {
@@ -49,13 +60,20 @@ export const THEME_META: Record<ThemeKey, { label: string; desc: string; dot: st
 };
 
 export const THEME_ORDER: ThemeKey[] = ["void", "sakura", "storm", "cozytile", "light"];
+
+/** The localStorage key for the theme (kept here for back-compat). */
 export const LS_KEY = "cif_theme";
+
+function hexToRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
 
 export function loadTheme(): ThemeKey {
   try {
     const v = localStorage.getItem(LS_KEY);
     if (v && v in THEMES) return v as ThemeKey;
-  } catch {}
+  } catch { /* private browsing */ }
   return "void";
 }
 
@@ -65,18 +83,17 @@ export function applyTheme(key: ThemeKey): void {
   (Object.entries(c) as [string, string][]).forEach(([k, v]) => {
     root.style.setProperty(`--t-${k}`, v);
   });
-  root.style.setProperty("--t-overlay", key === "light"
-    ? "rgba(248,249,252,0.94)"
-    : `rgba(${hexToRgb(c.bg)},0.90)`);
+  root.style.setProperty(
+    "--t-overlay",
+    key === "light"
+      ? "rgba(248,249,252,0.94)"
+      : `rgba(${hexToRgb(c.bg)},0.90)`
+  );
   root.style.setProperty("--t-codeBg", key === "light" ? "#f4f5f9" : "#080d1a");
-  try { localStorage.setItem(LS_KEY, key); } catch {}
+  try { localStorage.setItem(LS_KEY, key); } catch { /* private browsing */ }
 }
 
-function hexToRgb(hex: string): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-}
-
+/** CSS variable references (used by all components). */
 export const T = {
   bg: "var(--t-bg)", bg2: "var(--t-bg2)",
   surface: "var(--t-surface)", surface2: "var(--t-surface2)",

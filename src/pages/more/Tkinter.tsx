@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -134,7 +135,7 @@ function TabApps() {
 
 export default function Tkinter() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_tkinter") ?? "intro"; } catch { return "intro"; }
+    return storage.getTab("tkinter") ?? "intro";
   });
   const content: Record<string, React.ReactNode> = {
     intro:<TabIntro/>, widgets:<TabWidgets/>, layout:<TabLayout/>,

@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -419,7 +420,7 @@ def risky():
 
 export default function FlaskIntermediate() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_flask-inter") ?? "jinja2"; } catch { return "jinja2"; }
+    return storage.getTab("flask-inter") ?? "jinja2";
   });
   return (
     <div style={{ padding:"0 0 40px" }}>

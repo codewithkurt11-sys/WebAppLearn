@@ -1,11 +1,33 @@
+/**
+ * useWindowWidth — returns the current window inner width.
+ *
+ * Performance improvement:
+ *  - The resize event is debounced (100 ms) so components that use this
+ *    hook (there are many) don't all re-render on every pixel change while
+ *    the user drags the window edge.
+ */
+
 import { useState, useEffect } from "react";
 
 export function useWindowWidth(): number {
-  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1280);
+  const [width, setWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1280
+  );
+
   useEffect(() => {
-    const handler = () => setW(window.innerWidth);
+    let timer: ReturnType<typeof setTimeout>;
+
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setWidth(window.innerWidth), 100);
+    };
+
     window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", handler);
+    };
   }, []);
-  return w;
+
+  return width;
 }

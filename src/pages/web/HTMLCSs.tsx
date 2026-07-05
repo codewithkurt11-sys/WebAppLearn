@@ -1,3 +1,4 @@
+import { storage } from "../../services/storage";
 import { useState } from "react";
 import { T, CodeBlock, InfoBox, Card, CardTitle, IC, TabBar, PageHeader, Quiz, Tab, Question } from "../../shared";
 
@@ -1371,7 +1372,7 @@ body {
 
 export default function HTMLCSs() {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("cif_tab_html-css") ?? "whatishtml"; } catch { return "whatishtml"; }
+    return storage.getTab("html-css") ?? "whatishtml";
   });
   const content: Record<string, React.ReactNode> = {
     whatishtml:<TabWhatIsHTML/>, basics:<TabBasics/>, elements:<TabElements/>,

@@ -79,8 +79,21 @@ const CsharpBasics     = lazy(() => import("./pages/other/CsharpBasics"));
 const CsharpIntermediate= lazy(() => import("./pages/other/CsharpIntermediate"));
 const CsharpAdvanced   = lazy(() => import("./pages/other/CsharpAdvanced"));
 const Home             = lazy(() => import("./pages/Home"));
+const NotFound         = lazy(() => import("./pages/not-found"));
 
 const SIDEBAR_W = 220;
+
+/** All page IDs that are explicitly handled by PageRenderer. */
+const KNOWN_PAGES = new Set([
+  "home", "dashboard", "roadmap", "cheatsheet", "components",
+  "feedback", "settings", "profile",
+  "py-basics", "py-inter", "py-adv",
+  "flask-basics", "flask-inter", "flask-expert",
+  "js-basics", "js-inter", "js-adv",
+  "tkinter", "kivy", "scraping", "sqlite", "html-css",
+  "cpp-basics", "cpp-inter", "cpp-adv",
+  "cs-basics", "cs-inter", "cs-adv",
+]);
 
 /** Pages that are accessible to unauthenticated users (guests). */
 const PUBLIC_PAGES = new Set(["home"]);
@@ -150,6 +163,7 @@ const PageRenderer = memo(function PageRenderer({
             {page === "cs-basics"  && <CsharpBasics />}
             {page === "cs-inter"   && <CsharpIntermediate />}
             {page === "cs-adv"     && <CsharpAdvanced />}
+            {!KNOWN_PAGES.has(page) && <NotFound />}
           </div>
         </Suspense>
       </ErrorBoundary>

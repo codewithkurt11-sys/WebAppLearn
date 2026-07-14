@@ -32,15 +32,23 @@ export const USER_KEYS = {
   recentSearch:   "cif_recent_search",
   timeSpent:      "cif_time_spent",
   memberSince:    "cif_member_since",
-  fbRate:         "cif_fb_rate",
-  fbHearts:       "cif_hearts",
   roadmapOrder:   "cif_roadmap_order",
-  feedbackLocal:  "cif_feedback_local",
+  feedback:       "cif_feedback",
   // Tab-state keys use a dynamic prefix: cif_tab_<pageId>
   tabPrefix:      "cif_tab_",
 } as const;
 
 type LocalKey  = typeof LOCAL_KEYS[keyof typeof LOCAL_KEYS];
+
+// ─── Typed shapes ─────────────────────────────────────────────────────────
+
+/** One feedback entry per user per lesson track (matches Supabase feedback row). */
+export interface LocalFeedbackEntry {
+  track_id:   string;
+  rating:     number;   // 1–5
+  comment:    string;
+  updated_at: string;   // ISO-8601
+}
 
 // ─── Low-level helpers ────────────────────────────────────────────────────
 
@@ -54,7 +62,7 @@ function remove(key: string): void {
   try { localStorage.removeItem(key); } catch { /* ignore */ }
 }
 
-// ─── Typed typed typed getters / setters ──────────────────────────────────
+// ─── Typed getters / setters ──────────────────────────────────────────────
 
 export const storage = {
   // ---------- theme --------------------------------------------------
@@ -123,35 +131,19 @@ export const storage = {
 
   // ---------- roadmap track order ------------------------------------
   getRoadmapOrder: (): string[] | null => {
-    const raw = read("cif_roadmap_order");
+    const raw = read(USER_KEYS.roadmapOrder);
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   },
-  setRoadmapOrder: (v: string[]) => write("cif_roadmap_order", JSON.stringify(v)),
+  setRoadmapOrder: (v: string[]) => write(USER_KEYS.roadmapOrder, JSON.stringify(v)),
 
-  // ---------- feedback offline cache --------------------------------
-  getFeedbackLocal: (): unknown[] => {
-    const raw = read("cif_feedback_local");
+  // ---------- per-track feedback (offline fallback) ------------------
+  getFeedback: (): LocalFeedbackEntry[] => {
+    const raw = read(USER_KEYS.feedback);
     if (!raw) return [];
     try { return JSON.parse(raw); } catch { return []; }
   },
-  setFeedbackLocal: (v: unknown[]) => write("cif_feedback_local", JSON.stringify(v)),
-
-  // ---------- feedback rate limit ------------------------------------
-  getFbRate: (): { date: string; count: number } | null => {
-    const raw = read(USER_KEYS.fbRate);
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
-  },
-  setFbRate: (v: { date: string; count: number }) => write(USER_KEYS.fbRate, JSON.stringify(v)),
-
-  // ---------- feedback hearts ----------------------------------------
-  getFbHearts: (): Record<string, boolean> => {
-    const raw = read(USER_KEYS.fbHearts);
-    if (!raw) return {};
-    try { return JSON.parse(raw); } catch { return {}; }
-  },
-  setFbHearts: (v: Record<string, boolean>) => write(USER_KEYS.fbHearts, JSON.stringify(v)),
+  setFeedback: (v: LocalFeedbackEntry[]) => write(USER_KEYS.feedback, JSON.stringify(v)),
 
   // ─── Bulk operations ────────────────────────────────────────────────
 

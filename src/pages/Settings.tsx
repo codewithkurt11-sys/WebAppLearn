@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { Copy, Check, RefreshCw, LogOut, AlertTriangle, Trash2, X } from "lucide-react";
+import { Copy, Check, RefreshCw, LogOut, AlertTriangle } from "lucide-react";
 import type { ThemeKey } from "../utils/theme";
 import { T, THEMES, THEME_ORDER, THEME_META } from "../utils/theme";
 import { useAuth } from "../contexts/AuthContext";
@@ -34,7 +34,7 @@ const FONT_SIZES = ["S", "M", "L"] as const;
 type Size = typeof FONT_SIZES[number];
 
 export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps) {
-  const { user, signOut, deleteAccount } = useAuth();
+  const { user, signOut } = useAuth();
   const { clearProgress } = useProgressCtx();
   const isMobile = useWindowWidth() < 900;
   const [reduce, setReduce] = useReduceMotion();
@@ -46,8 +46,6 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [resetting,      setResetting]      = useState(false);
   const [signingOut,     setSigningOut]     = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting,        setDeleting]        = useState(false);
 
   // Apply font-size CSS variable whenever the size preference changes.
   useEffect(() => {
@@ -106,34 +104,6 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
     } finally {
       setSigningOut(false);
       setConfirmSignOut(false);
-    }
-  };
-
-  /**
-   * handleDeleteAccount — permanently deletes the Supabase user record.
-   * Delegates to AuthContext.deleteAccount(), which calls the server-side
-   * `delete-account` Edge Function (service-role key never touches the client)
-   * and then signs out. On success the user is redirected to home by InnerApp.
-   *
-   * NOTE (flagged for schema owner): cleanup of user_progress / feedback rows
-   * is NOT handled here — it belongs to the schema owner via ON DELETE CASCADE
-   * on the auth.users FK (or dedicated cleanup in the Edge Function).
-   */
-  const handleDeleteAccount = async () => {
-    setDeleting(true);
-    try {
-      const { error } = await deleteAccount();
-      if (error) {
-        toast.error(error);
-        return;
-      }
-      toast.success("Your account has been permanently deleted.");
-      setShowDeleteModal(false);
-      // signOut() (called inside deleteAccount) clears state → app redirects.
-    } catch {
-      toast.error("Couldn't delete your account — please try again.");
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -363,138 +333,18 @@ export default function Settings({ theme, setTheme, onShowAuth }: SettingsProps)
           </div>
 
           <div style={{
-            paddingTop: 14, borderTop: `1px solid ${T.rose}22`,
+            padding: "10px 12px",
+            background: `${T.amber}08`, border: `1px solid ${T.amber}30`,
+            borderRadius: 8, display: "flex", gap: 8, alignItems: "flex-start",
           }}>
-            <div style={{ fontSize: 12, color: T.muted2, marginBottom: 10, lineHeight: 1.5 }}>
-              <strong style={{ color: T.rose }}>Delete account</strong>
-              <br />
-              Permanently deletes your account and cloud sign-in. This action
-              cannot be undone.
+            <AlertTriangle size={14} color={T.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 11.5, color: T.muted2, lineHeight: 1.5 }}>
+              <strong style={{ color: T.amber }}>Want to fully delete your account?</strong>
+              {" "}Account deletion requires contacting support — it cannot be done from the browser for security reasons.
             </div>
-            <DangerBtn onClick={() => setShowDeleteModal(true)} icon={<Trash2 size={13} />}>
-              Delete my account
-            </DangerBtn>
           </div>
         </Card>
       )}
-
-      {/* ── Delete-account confirmation modal ──────────── */}
-      {showDeleteModal && user && (
-        <DeleteAccountModal
-          email={user.email ?? ""}
-          deleting={deleting}
-          onCancel={() => { if (!deleting) setShowDeleteModal(false); }}
-          onConfirm={handleDeleteAccount}
-        />
-      )}
-    </div>
-  );
-}
-
-/* ───────────────── Delete-account modal ───────────────── */
-
-function DeleteAccountModal({
-  email, deleting, onCancel, onConfirm,
-}: {
-  email: string;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const [typed, setTyped] = useState("");
-  // Require the user to type "DELETE" to arm the destructive action.
-  const armed = typed.trim().toUpperCase() === "DELETE";
-
-  // Close on Escape (unless a deletion is in-flight).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !deleting) onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [deleting, onCancel]);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm account deletion"
-      onClick={onCancel}
-      style={{
-        position: "fixed", inset: 0, zIndex: 1000,
-        background: "rgba(0,0,0,.55)", backdropFilter: "blur(2px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: T.surface, border: `1px solid ${T.rose}44`,
-          borderRadius: 16, padding: "22px 22px 20px",
-          maxWidth: 420, width: "100%",
-          boxShadow: `0 24px 60px rgba(0,0,0,.4)`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-            background: `${T.rose}18`, border: `1px solid ${T.rose}44`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <AlertTriangle size={17} color={T.rose} />
-          </div>
-          <h2 style={{
-            margin: 0, fontFamily: "'Bricolage Grotesque',sans-serif",
-            fontWeight: 800, fontSize: 17, letterSpacing: "-0.4px", color: T.text,
-          }}>Delete account?</h2>
-          <button
-            onClick={onCancel}
-            disabled={deleting}
-            aria-label="Close dialog"
-            style={{
-              marginLeft: "auto", width: 28, height: 28, borderRadius: 7,
-              background: T.bg2, border: `1px solid ${T.border}`,
-              color: T.muted2, cursor: deleting ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: deleting ? 0.5 : 1,
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <p style={{ fontSize: 13, color: T.muted2, lineHeight: 1.6, margin: "0 0 12px" }}>
-          This permanently deletes the account for{" "}
-          <strong style={{ color: T.text }}>{email || "this user"}</strong>.
-          This action <strong style={{ color: T.rose }}>cannot be undone</strong>.
-        </p>
-
-        <label style={{ display: "block", fontSize: 11.5, color: T.muted2, marginBottom: 6 }}>
-          Type <strong style={{ color: T.text }}>DELETE</strong> to confirm:
-        </label>
-        <input
-          value={typed}
-          onChange={e => setTyped(e.target.value)}
-          placeholder="DELETE"
-          aria-label="Type DELETE to confirm"
-          autoFocus
-          disabled={deleting}
-          style={{
-            width: "100%", background: T.bg2,
-            border: `1px solid ${armed ? T.rose : T.border}`, borderRadius: 8,
-            padding: "9px 12px", color: T.text, fontSize: 13,
-            fontFamily: "'Fira Code',monospace", outline: "none", marginBottom: 16,
-          }}
-        />
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <SecondaryBtn onClick={onCancel}>Cancel</SecondaryBtn>
-          <DangerBtn onClick={onConfirm} disabled={!armed || deleting} icon={<Trash2 size={13} />}>
-            {deleting ? "Deleting…" : "Delete forever"}
-          </DangerBtn>
-        </div>
-      </div>
     </div>
   );
 }

@@ -31,12 +31,6 @@ interface AuthCtxType {
   signIn:  (email: string, password: string) => Promise<{ error: string | null }>;
   signUp:  (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  /**
-   * Permanently deletes the current user's Supabase account via the
-   * server-side `delete-account` Edge Function (service-role key stays on the
-   * server), then signs out locally. Returns a typed error string on failure.
-   */
-  deleteAccount: () => Promise<{ error: string | null }>;
 }
 
 const AuthCtx = createContext<AuthCtxType | null>(null);
@@ -124,48 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  /**
-   * deleteAccount — permanently removes the user's Supabase auth record.
-   *
-   * The actual deletion happens server-side in the `delete-account` Edge
-   * Function (which alone holds the service-role key). We invoke it with the
-   * user's session (the JWT is forwarded automatically), then sign out so the
-   * local app state is cleared. This does NOT touch login/signup/session
-   * restore logic — it only defines the Delete Account button behavior.
-   *
-   * NOTE (flagged for schema owner): cascade cleanup of `user_progress` /
-   * `feedback` rows is intentionally NOT done here — it belongs to the schema
-   * owner (see the Edge Function comment).
-   */
-  const deleteAccount = async (): Promise<{ error: string | null }> => {
-    if (!supabaseEnabled || !supabase) {
-      return { error: "Account deletion is not available (auth not configured)." };
-    }
-    try {
-      const { data, error } = await supabase.functions.invoke<{
-        success?: boolean;
-        error?: string;
-      }>("delete-account", { method: "POST" });
-
-      if (error) {
-        return { error: error.message || "Failed to delete account." };
-      }
-      if (!data?.success) {
-        return { error: data?.error || "Failed to delete account." };
-      }
-
-      // Deletion succeeded server-side — clear local session/state.
-      await signOut();
-      return { error: null };
-    } catch (e: unknown) {
-      return { error: e instanceof Error ? e.message : "An unexpected error occurred." };
-    }
-  };
-
   // Memoize the context value so downstream consumers only re-render when
   // one of the actual auth values changes, not on every parent render.
   const value = useMemo<AuthCtxType>(
-    () => ({ user, session, loading, signIn, signUp, signOut, deleteAccount }),
+    () => ({ user, session, loading, signIn, signUp, signOut }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, session, loading]
   );

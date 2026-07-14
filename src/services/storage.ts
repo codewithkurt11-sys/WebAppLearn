@@ -10,8 +10,8 @@
  *  - It is trivially swappable with sessionStorage or a mock in tests.
  *
  * Keys are split into two groups:
- *  LOCAL_ONLY  — UX preferences that stay on this device (never cleared on logout)
- *  USER_SCOPED — data that is tied to a specific user (cleared on logout / user change)
+ *  LOCAL_KEYS — UX preferences that stay on this device (never cleared on logout)
+ *  USER_KEYS  — data tied to a specific user (cleared on logout / user change)
  */
 
 // ─── Key declarations ─────────────────────────────────────────────────────
@@ -38,16 +38,18 @@ export const USER_KEYS = {
   tabPrefix:      "cif_tab_",
 } as const;
 
-type LocalKey  = typeof LOCAL_KEYS[keyof typeof LOCAL_KEYS];
+type LocalKey = typeof LOCAL_KEYS[keyof typeof LOCAL_KEYS];
 
 // ─── Typed shapes ─────────────────────────────────────────────────────────
 
-/** One feedback entry per user per lesson track (matches Supabase feedback row). */
+/**
+ * One offline feedback entry per lesson (liked toggle).
+ * Matches the Supabase feedback table: user_id, track_id, lesson_id, liked.
+ * user_id is not stored here — it comes from the auth context at save time.
+ */
 export interface LocalFeedbackEntry {
-  track_id:   string;
-  rating:     number;   // 1–5
-  comment:    string;
-  updated_at: string;   // ISO-8601
+  lesson_id: string;
+  liked:     boolean;
 }
 
 // ─── Low-level helpers ────────────────────────────────────────────────────
@@ -137,7 +139,8 @@ export const storage = {
   },
   setRoadmapOrder: (v: string[]) => write(USER_KEYS.roadmapOrder, JSON.stringify(v)),
 
-  // ---------- per-track feedback (offline fallback) ------------------
+  // ---------- per-lesson liked feedback (offline fallback) -----------
+  // Matches Supabase feedback table schema: lesson_id text, liked bool.
   getFeedback: (): LocalFeedbackEntry[] => {
     const raw = read(USER_KEYS.feedback);
     if (!raw) return [];
@@ -161,15 +164,15 @@ export const storage = {
   },
 
   /**
-   * Remove only progress-adjacent keys (used by clearProgress in the
-   * progress context, without wiping display-name, etc.).
+   * Removes only progress-adjacent keys (used by clearProgress in the
+   * progress context, without wiping display-name, feedback, etc.).
    */
   clearProgressData(): void {
     try {
       const progressKeys = Object.keys(localStorage).filter(
         k => k === USER_KEYS.recentPages ||
              k === USER_KEYS.timeSpent   ||
-             k.startsWith(USER_KEYS.tabPrefix)
+             k.startsWith(USER_KEYS.tabPrefix),
       );
       progressKeys.forEach(k => remove(k));
     } catch { /* ignore */ }

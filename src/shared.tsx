@@ -9,7 +9,7 @@ import { storage }                      from "./services/storage";
 
 // ─── LOCAL IMPORTS ─────────────────────────────────────────────────
 import type { ReactNode } from "react";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { T } from "./utils/theme";
 import { RunCtx } from "./contexts/AppContext";
 import { useWindowWidth } from "./hooks/useWindowWidth";
@@ -131,51 +131,126 @@ export async function getPyodide() {
   return _pyodide;
 }
 
-// ─── JS IFRAME RUNNER ─────────────────────────────────────────────
-interface RunResult { output: string; elapsed: string; }
-function runJSInIframe(code: string): Promise<RunResult> {
+// ─── JS WEB-WORKER RUNNER ─────────────────────────────────────────
+//
+// User-submitted JS is executed inside a dedicated Web Worker instead of a
+// synchronous iframe eval.  This is the ONLY reliable way to guarantee that a
+// runaway program (e.g. `while (true) {}`) cannot hang the browser tab:
+//
+//   • The worker runs on its own thread, so an infinite loop never blocks the
+//     main UI thread — the page stays responsive.
+//   • A hard timeout on the main thread calls `worker.terminate()`, which
+//     forcibly kills the worker EVEN IF it is stuck in a synchronous infinite
+//     loop (a postMessage-based timeout could never interrupt such a loop
+//     because the worker never returns to its event loop).
+//
+// The worker source is shipped as a blob URL.  Our CSP allows this via
+// `worker-src 'self' blob:` (see vercel.json).
+//
+// NOTE: `TIMEOUT_MS` (5s) is intentionally shorter than the Pyodide/Python
+// timeout (10s) because JS starts instantly (no runtime to download).
+
+const JS_RUN_TIMEOUT_MS = 5000;
+
+interface RunResult { output: string; elapsed: string; timedOut?: boolean }
+
+/** Worker body — captures console output, runs the user code, posts a result. */
+const JS_WORKER_SOURCE = `
+self.onmessage = function (e) {
+  if (!e.data || e.data.type !== 'run') return;
+  var _logs = [];
+  var _fmt = function (a) {
+    try { return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a); }
+    catch (err) { return String(a); }
+  };
+  // Route console + alert into the captured log buffer.
+  self.console = self.console || {};
+  console.log   = function () { _logs.push({ t: 'log',  v: [].map.call(arguments, _fmt).join(' ') }); };
+  console.info  = console.log;
+  console.debug = console.log;
+  console.error = function () { _logs.push({ t: 'err',  v: [].map.call(arguments, _fmt).join(' ') }); };
+  console.warn  = function () { _logs.push({ t: 'warn', v: [].map.call(arguments, _fmt).join(' ') }); };
+  self.alert    = function (m) { _logs.push({ t: 'log', v: '[alert] ' + String(m) }); };
+
+  var _t = performance.now();
+  try {
+    // Indirect eval so user code runs in the (worker) global scope, matching
+    // the previous behaviour. Function constructor keeps it out of this scope.
+    (new Function(e.data.code))();
+  } catch (err) {
+    _logs.push({ t: 'err', v: ((err && err.name) || 'Error') + ': ' + ((err && err.message) || String(err)) });
+  }
+  var elapsed = (performance.now() - _t).toFixed(1);
+  var lines = _logs.map(function (l) {
+    return l.t === 'err' ? '❌ ' + l.v : l.t === 'warn' ? '⚠ ' + l.v : l.v;
+  });
+  self.postMessage({ type: 'result', output: lines.join('\\n'), elapsed: elapsed });
+};
+`;
+
+/**
+ * Runs user JS in a terminable Web Worker.
+ *
+ * @param onWorker  Optional callback receiving the created Worker so the caller
+ *                  can expose a manual "stop" / kill control if desired.
+ * @returns RunResult with `timedOut: true` when the hard timeout fired and the
+ *          worker was force-terminated.
+ */
+function runJSInWorker(code: string, onWorker?: (w: Worker) => void): Promise<RunResult> {
   return new Promise(resolve => {
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("sandbox", "allow-scripts");
-    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;top:-9999px";
-    document.body.appendChild(iframe);
-    const timer = setTimeout(() => {
-      window.removeEventListener("message", handler);
-      iframe.remove();
-      resolve({ output: "⚠ Execution timed out after 10s", elapsed: "10000" });
-    }, 10000);
-    function handler(e: MessageEvent) {
-      if (e.source !== iframe.contentWindow) return;
-      const d = e.data as any;
-      if (!d) return;
-      if (d.type === "ready") {
-        iframe.contentWindow!.postMessage({ type: "run", code: code.trim() }, "*");
-      } else if (d.type === "result") {
-        clearTimeout(timer);
-        window.removeEventListener("message", handler);
-        iframe.remove();
-        resolve({ output: d.output, elapsed: d.elapsed });
-      }
+    let worker: Worker;
+    let blobUrl: string;
+    try {
+      const blob = new Blob([JS_WORKER_SOURCE], { type: "application/javascript" });
+      blobUrl = URL.createObjectURL(blob);
+      worker = new Worker(blobUrl);
+    } catch {
+      resolve({
+        output: "❌ Could not start the JavaScript runner in this browser.",
+        elapsed: "0",
+      });
+      return;
     }
-    window.addEventListener("message", handler);
-    iframe.srcdoc = `<!DOCTYPE html><html><body><script>
-const _logs=[];
-const _fmt=a=>{try{return typeof a==='object'?JSON.stringify(a,null,2):String(a);}catch(e){return String(a);}};
-console.log=(...a)=>_logs.push({t:'log',v:a.map(_fmt).join(' ')});
-console.error=(...a)=>_logs.push({t:'err',v:a.map(_fmt).join(' ')});
-console.warn=(...a)=>_logs.push({t:'warn',v:a.map(_fmt).join(' ')});
-window.alert=m=>_logs.push({t:'log',v:'[alert] '+String(m)});
-window.addEventListener('message',function(e){
-  if(!e.data||e.data.type!=='run')return;
-  const _t=performance.now();
-  try{(new Function(e.data.code))();}
-  catch(err){_logs.push({t:'err',v:(err.name||'Error')+': '+err.message});}
-  const elapsed=(performance.now()-_t).toFixed(1);
-  const lines=_logs.map(l=>l.t==='err'?'❌ '+l.v:l.t==='warn'?'⚠ '+l.v:l.v);
-  parent.postMessage({type:'result',output:lines.join('\\n'),elapsed},'*');
-});
-parent.postMessage({type:'ready'},'*');
-<\/script></body></html>`;
+
+    let settled = false;
+    const cleanup = () => {
+      try { worker.terminate(); } catch { /* already gone */ }
+      try { URL.revokeObjectURL(blobUrl); } catch { /* noop */ }
+    };
+    const finish = (result: RunResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.onmessage = null;
+      worker.onerror = null;
+      cleanup();
+      resolve(result);
+    };
+
+    // Hard timeout → forcibly kill the worker (handles infinite loops).
+    const timer = setTimeout(() => {
+      finish({
+        output: `⚠ Execution timed out after ${JS_RUN_TIMEOUT_MS / 1000}s — your code was stopped (possible infinite loop).`,
+        elapsed: String(JS_RUN_TIMEOUT_MS),
+        timedOut: true,
+      });
+    }, JS_RUN_TIMEOUT_MS);
+
+    worker.onmessage = (e: MessageEvent) => {
+      const d = e.data as { type?: string; output?: string; elapsed?: string } | null;
+      if (!d || d.type !== "result") return;
+      finish({ output: d.output ?? "", elapsed: d.elapsed ?? "0" });
+    };
+
+    worker.onerror = (e: ErrorEvent) => {
+      finish({
+        output: "❌ " + (e.message || "Worker error"),
+        elapsed: "0",
+      });
+    };
+
+    onWorker?.(worker);
+    worker.postMessage({ type: "run", code: code.trim() });
   });
 }
 
@@ -206,7 +281,10 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   const [output, setOutput]     = useState<string | null>(null);
   const [execTime, setExecTime] = useState<string | null>(null);
   const [running, setRunning]   = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   const [pyReady, setPyReady]   = useState(_pyodideReady);
+  // Holds the live JS worker so it can be killed manually or on unmount.
+  const jsWorkerRef = useRef<Worker | null>(null);
 
   const lines = code.trim().split("\n");
   const [collapsed, setCollapsed] = useState(() => lines.length > COLLAPSE_THRESHOLD);
@@ -228,13 +306,45 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Terminate any live JS worker if the component unmounts mid-run.
+  useEffect(() => {
+    return () => {
+      if (jsWorkerRef.current) {
+        try { jsWorkerRef.current.terminate(); } catch { /* noop */ }
+        jsWorkerRef.current = null;
+      }
+    };
+  }, []);
+
+  /** Manually kill a running JS program (used by the "stop" button). */
+  const stopJS = () => {
+    if (jsWorkerRef.current) {
+      try { jsWorkerRef.current.terminate(); } catch { /* noop */ }
+      jsWorkerRef.current = null;
+    }
+    setTimedOut(true);
+    setOutput("⛔ Execution stopped.");
+    setExecTime(null);
+    setRunning(false);
+  };
+
   const runCode = async () => {
     setRunning(true);
+    setTimedOut(false);
     setOutput(null);
     setExecTime(null);
     if (lang === "js") {
-      const { output: out, elapsed } = await runJSInIframe(code);
-      setOutput(out.trim() || "(no output — add console.log to see results)");
+      const { output: out, elapsed, timedOut: didTimeOut } = await runJSInWorker(
+        code,
+        w => { jsWorkerRef.current = w; },
+      );
+      jsWorkerRef.current = null;
+      setTimedOut(!!didTimeOut);
+      setOutput(
+        didTimeOut
+          ? out
+          : (out.trim() || "(no output — add console.log to see results)"),
+      );
       setExecTime(elapsed);
     } else if (lang === "py") {
       if (!_pyodideReady) { setOutput("⏳ Loading Python runtime…"); setRunning(false); return; }
@@ -265,7 +375,7 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
     setRunning(false);
   };
 
-  const clearOutput = () => { setOutput(null); setExecTime(null); };
+  const clearOutput = () => { setOutput(null); setExecTime(null); setTimedOut(false); };
   const LANG_LABELS: Record<string, string> = { py: "python", js: "javascript", sql: "sql", bash: "shell", html: "html" };
   const LANG_DOTS:   Record<string, string> = { py: "#7c6dfa", js: "#fbbf24", sql: "#38bdf8", bash: "#34d399", html: "#fb7185" };
   const dot = LANG_DOTS[lang] || T.muted2;
@@ -303,6 +413,14 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
             transition: "all .2s", cursor: runDisabled ? "wait" : "pointer", marginRight: 2,
             opacity: pyLoading && !running ? 0.6 : 1,
           }}>{runBtnLabel}</button>
+        )}
+        {canRun && lang === "js" && running && (
+          <button onClick={stopJS} title="Stop execution" style={{
+            background: "rgba(251,113,133,.12)", border: `1px solid ${T.rose}`,
+            borderRadius: 5, color: T.rose,
+            fontFamily: "'Fira Code',monospace", fontSize: 10, padding: "3px 10px",
+            transition: "all .2s", cursor: "pointer", marginRight: 2,
+          }}>■ stop</button>
         )}
         {output !== null && (
           <button onClick={clearOutput} style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 5, color: T.muted2, fontFamily: "'Fira Code',monospace", fontSize: 10, padding: "3px 8px", cursor: "pointer", marginRight: 2 }}>
@@ -342,7 +460,14 @@ export function CodeBlock({ code, lang = "py", title, showLines = false, runnabl
         <div style={{ borderTop: `1px solid ${T.border}`, background: T.bg, fontFamily: "'Fira Code',monospace", fontSize: 11.5, maxHeight: 240, overflowY: "auto", lineHeight: 1.75 }}>
           <div style={{ padding: "8px 16px 4px", display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: T.muted, fontSize: 10, userSelect: "none" }}>▶ output</span>
-            {execTime && <span style={{ fontSize: 9, color: T.muted, fontFamily: "'Fira Code',monospace" }}>{execTime}ms</span>}
+            {timedOut && (
+              <span style={{
+                fontSize: 9, color: T.amber, fontFamily: "'Fira Code',monospace",
+                border: `1px solid ${T.amber}`, borderRadius: 4, padding: "1px 6px",
+                background: "rgba(251,191,36,.1)", letterSpacing: "0.5px",
+              }}>⏱ timed out</span>
+            )}
+            {execTime && !timedOut && <span style={{ fontSize: 9, color: T.muted, fontFamily: "'Fira Code',monospace" }}>{execTime}ms</span>}
           </div>
           <div style={{ padding: "0 16px 12px" }}>
             {output.split("\n").map((line, i) => {

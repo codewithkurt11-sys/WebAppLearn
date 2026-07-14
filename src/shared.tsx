@@ -535,6 +535,27 @@ export function Quiz({ questions, trackKey, trackId }: { questions: Question[]; 
           </div>
           {saving && <span style={{ fontSize: 11.5, color: T.muted, fontFamily: "'Fira Code',monospace" }}>saving…</span>}
           {saved  && <span style={{ fontSize: 11.5, color: T.green, fontFamily: "'Fira Code',monospace" }}>✓ saved</span>}
+          <button
+            onClick={() => { setAnswers({}); setSubmit(false); setSaved(false); }}
+            style={{
+              padding: "10px 18px", borderRadius: 9,
+              background: "transparent",
+              border: `1px solid ${T.border2}`,
+              color: T.muted2,
+              fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 12.5,
+              cursor: "pointer", transition: "all .15s",
+            }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.borderColor = T.accent;
+              el.style.color = T.accent;
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.borderColor = T.border2;
+              el.style.color = T.muted2;
+            }}
+          >↺ Retry Quiz</button>
         </div>
       )}
     </div>
